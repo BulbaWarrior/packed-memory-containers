@@ -84,4 +84,3 @@ insert = undefined
 
 insertBatch :: [(Coords n, a)] -> PMQ n t a -> PMQ n t a
 insertBatch = undefined
-

@@ -26,6 +26,12 @@ dependencies:
 library:
   source-dirs: src
 
+executables:
+  pma-exe:
+    main:                Setup.hs
+    dependencies:
+    - packed-memory-quadtree
+
 tests:
   packed-memory-quadtree-test:
     main:                Spec.hs
