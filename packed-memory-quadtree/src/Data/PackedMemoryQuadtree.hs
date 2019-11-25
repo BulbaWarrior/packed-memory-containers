@@ -11,21 +11,6 @@ import           Numeric      (readInt, showIntAtBase)
 
 data Coords (n :: Nat) = Coords Int Int
 
--- | Packed-memory (sorted) array of values.
-data PMA a = PMA
-  { pmaValues :: Vector (Maybe a)
-  , pmaValid  :: !Int
-  }
-
-emptyPMA :: PMA a
-emptyPMA = PMA
-  { pmaValues = Vector.empty
-  , pmaValid  = 0
-  }
-
-
-
-
 newtype ZIndex (n :: Nat) = ZIndex Int
   deriving (Eq, Ord, Show)
 
@@ -62,25 +47,3 @@ interleaveBinary xs ys = concat (alignWith (\x y -> x : y : "") xs ys)
 zindexOf :: KnownNat n => Coords n -> ZIndex n
 zindexOf (Coords x y) = ZIndex $
   readBinary (reverse (interleaveBinary (reverse (showBinary x)) (reverse (showBinary y))))
-
-
-
-data PMQ n t a = PMQ
-  { pmqSegments :: PMA (ZIndexed n [(t, a)])
-  , pmqCounts   :: Vector Int
-  }
-
-emptyPMQ :: PMQ n t a
-emptyPMQ = PMQ
-  { pmqSegments = emptyPMA
-  , pmqCounts = Vector.empty
-  }
-
-rebalancePMQ :: PMQ n t a -> PMQ n t a
-rebalancePMQ = undefined
-
-insert :: (Coords n, a) -> PMQ n t a -> PMQ n t a
-insert = undefined
-
-insertBatch :: [(Coords n, a)] -> PMQ n t a -> PMQ n t a
-insertBatch = undefined

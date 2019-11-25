@@ -1,21 +1,37 @@
-{-# OPTIONS_GHC -fdefer-type-errors #-}
+{-# OPTIONS_GHC -fdefer-type-errors -Wall -fno-warn-type-defaults #-}
+{-# LANGUAGE DeriveFoldable      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Data.PackedMemoryArray where
 
-import qualified Data.List   as List
-import           Prelude
 import           Data.Vector (Vector)
 import qualified Data.Vector as Vector
+import           Prelude
+
+import           Debug.Trace
+
+samplePMA_1 :: PMA Int
+samplePMA_1 = PMA
+  { capacity = 8
+  , segmentCapacity = 4
+  , height = 2
+  , elements = Vector.fromList
+      [ Just 1, Just 2, Just 3, Just 4
+      , Nothing, Nothing, Nothing, Nothing
+      ]
+  , cardinality = 4
+  , segmentsCnt = 2
+  , segmentsCardinalities = Vector.fromList [4, 0]
+  }
 
 data PMA a = PMA
-  { capacity :: Int                       -- total capacity of PMA
-  , segmentCapacity :: Int                -- the size of single segment
-  , height :: Int                         -- the height of the binary tree for elements
-  , elements :: Vector (Maybe a)          -- the elements contained
-  , cardinality :: Int                    -- the number of elements contained
-  , segmentsCnt :: Int                    -- the number of segments
+  { capacity              :: Int                       -- total capacity of PMA
+  , segmentCapacity       :: Int                -- the size of single segment
+  , height                :: Int                         -- the height of the binary tree for elements
+  , elements              :: Vector (Maybe a)          -- the elements contained
+  , cardinality           :: Int                    -- the number of elements contained
+  , segmentsCnt           :: Int                    -- the number of segments
   , segmentsCardinalities :: Vector Int   -- the number of elements contained in current segment
-  } deriving (Show)
+  } deriving (Show, Eq, Foldable)
 
 minCapacity :: Int
 minCapacity = 8
@@ -125,6 +141,9 @@ resize pma = PMA
 -- Equally spread the elements in the interval [segmentCapacity * windowStart, segmentCapacity * (windowStart + windowLength) )
 spread :: PMA a -> Int -> Int -> Int -> PMA a
 spread pma elementsNum windowStart windowLength = pma
+  { segmentsCardinalities = newSegmentsCardinalities
+  , elements = newElements
+  }
   where
     windowEnd = windowStart + windowLength
     tmp = getValidValues (subVector (elements pma) startPos len)
@@ -133,7 +152,7 @@ spread pma elementsNum windowStart windowLength = pma
         len = (segmentCapacity pma) * windowLength
 
         subVector :: Vector (Maybe a) -> Int -> Int -> Vector (Maybe a)
-        subVector vec start len = Vector.take len (Vector.drop start vec)
+        subVector vec start n = Vector.take n (Vector.drop start vec)
 
         getValidValues :: Vector (Maybe a) -> Vector (Maybe a)
         getValidValues vec
@@ -141,8 +160,8 @@ spread pma elementsNum windowStart windowLength = pma
           | otherwise = takeIfValid (vec Vector.! 0) <> (Vector.drop 0 vec)
           where
             takeIfValid :: Maybe a -> Vector (Maybe a)
-            takeIfValid (Just val)  = Vector.singleton (Just val)
-            takeIfValid _           = Vector.empty
+            takeIfValid (Just val) = Vector.singleton (Just val)
+            takeIfValid _          = Vector.empty
 
     elementsPerSegment = elementsNum `div` windowLength
     oddSegmentsCnt = elementsNum `mod` windowLength
@@ -170,13 +189,13 @@ spread pma elementsNum windowStart windowLength = pma
       where
         replaceSubVector :: Int -> Vector Int -> Vector Int -> Vector Int
         replaceSubVector startPos newSubVector origVector =
-          (Vector.take startPos origVector) <> newSubVector <> (Vector.drop (startPos + (Vector.length newSubVector) - 1) origVector)
+          (Vector.take startPos origVector) <> newSubVector <> (Vector.drop (startPos + (Vector.length newSubVector)) origVector)
 
     newElements = replaceSubVector (windowStart * (segmentCapacity pma)) newSubElements (elements pma)
       where
         replaceSubVector :: Int -> Vector (Maybe a) -> Vector (Maybe a) -> Vector (Maybe a)
         replaceSubVector startPos newSubVector origVector =
-          (Vector.take startPos origVector) <> newSubVector <> (Vector.drop (startPos + (Vector.length newSubVector) - 1) origVector)
+          (Vector.take startPos origVector) <> newSubVector <> (Vector.drop (startPos + (Vector.length newSubVector)) origVector)
 
 
 rebalance :: PMA a -> Int -> PMA a
@@ -216,11 +235,11 @@ findSegment pma val = if (isEmpty pma) then 0 else (find pma 0 ((segmentsCnt pma
                             then (mid, mid)
                             else (mid + 1, ub)
 
-insert :: forall a. Ord a => PMA a -> a -> PMA a
+insert :: forall a. (Ord a, Show a) => PMA a -> a -> PMA a
 insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance pma segmentId) else newPMA
   where
     segmentId = findSegment pma val
-    (elements', posToInsert) = findPos (elements pma) ((segmentsCardinalities pma) Vector.! segmentId)
+    (elements', posToInsert) = traceShowId $ findPos (elements pma) ((segmentsCardinalities pma) Vector.! segmentId)
       where
         findPos :: Vector (Maybe a) -> Int -> (Vector (Maybe a), Int)
         findPos vec pos = if (pos > 0) && ((Just val) < (vec Vector.! (pos - 1)))
