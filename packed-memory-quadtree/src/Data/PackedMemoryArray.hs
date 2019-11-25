@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fdefer-type-errors #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Data.PackedMemoryArray where
 
 import qualified Data.List   as List
@@ -57,6 +58,9 @@ setElement pma pos v = pma
 -- init empty PMA (capacity == minCapacity)
 emptyPMA :: PMA a
 emptyPMA = initPMA minCapacity
+
+isEmpty :: PMA a -> Bool
+isEmpty pma = (cardinality pma) == 0
 
 clearPMA :: PMA a -> PMA a
 clearPMA _ = emptyPMA
@@ -175,8 +179,64 @@ spread pma elementsNum windowStart windowLength = pma
           (Vector.take startPos origVector) <> newSubVector <> (Vector.drop (startPos + (Vector.length newSubVector) - 1) origVector)
 
 
-insert :: Ord a => a -> PMA a -> PMA a
-insert x _ = undefined
+rebalance :: PMA a -> Int -> PMA a
+rebalance pma segmentId = rebalancedPMA
+  where
+    (newDensity, t_l, elementsCnt, windowStart, windowLength) =
+      if ((height pma) > 1)
+        then (tryHigher 2 2 (segmentId `div` 2))
+        else (1.0, t_h, ((segmentsCardinalities pma) Vector.! segmentId), segmentId, 1)
+      where
+        tryHigher :: Int -> Int -> Int -> (Double, Double, Int, Int, Int)
+        tryHigher l windowLength windowId = if ((density >= t_l) && l < (height pma)) then tryHigher (l + 1) (windowLength * 2) (windowId `div` 2) else (density, t_l, elementsCnt, windowStart, windowLength)
+          where
+            windowStart = windowId * windowLength --inclusive
+            windowEnd = windowStart + windowLength --exclusive
+            (p_l, t_l) = windowThresholds pma l
+            prefixSums = Vector.postscanl (+) 0 (segmentsCardinalities pma)
+            elementsCnt = if (windowStart == 0)
+                        then (prefixSums Vector.! (windowEnd - 1))
+                        else ((prefixSums Vector.! (windowEnd - 1)) - (prefixSums Vector.! windowStart))
+            density = (fromIntegral elementsCnt) / (fromIntegral (windowLength * (segmentCapacity pma)))
+
+    rebalancedPMA = if (newDensity >= t_l) then (resize pma) else (spread pma elementsCnt windowStart windowLength)
+
+
+
+findSegment :: forall a. Ord a => PMA a -> a -> Int
+findSegment pma val = if (isEmpty pma) then 0 else (find pma 0 ((segmentsCnt pma) - 1))
+  where
+    find :: PMA a -> Int -> Int -> Int
+    find pma lb ub = if (lb < ub) then (find pma newLB newUB) else lb
+      where
+        mid = (lb + ub) `div` 2
+        (newLB, newUB) =  if ((Just val) < ((elements pma) Vector.! (mid * (segmentCapacity pma))))
+                        then (lb, mid - 1)
+                        else  if ((Just val) <= ((elements pma) Vector.! ((mid * (segmentCapacity pma)) + ((segmentsCardinalities pma) Vector.! mid) - 1)))
+                            then (mid, mid)
+                            else (mid + 1, ub)
+
+insert :: forall a. Ord a => PMA a -> a -> PMA a
+insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance pma segmentId) else newPMA
+  where
+    segmentId = findSegment pma val
+    (elements', posToInsert) = findPos (elements pma) ((segmentsCardinalities pma) Vector.! segmentId)
+      where
+        findPos :: Vector (Maybe a) -> Int -> (Vector (Maybe a), Int)
+        findPos vec pos = if (pos > 0) && ((Just val) < (vec Vector.! (pos - 1)))
+                        then findPos ((Vector.take (pos - 1) vec) Vector.++ (Vector.singleton Nothing) Vector.++ (Vector.singleton (vec Vector.! (pos - 1))) Vector.++ (Vector.drop pos (Vector.take (segmentCapacity pma) vec))) (pos - 1)
+                        else (vec, pos)
+
+    newElements = Vector.update elements' (Vector.singleton (posToInsert, Just val))
+    newPMA = PMA
+            { capacity = capacity pma
+            , segmentCapacity = segmentCapacity pma
+            , height = height pma
+            , elements = newElements
+            , cardinality = (cardinality pma) + 1
+            , segmentsCnt = segmentsCnt pma
+            , segmentsCardinalities = Vector.update (segmentsCardinalities pma) (Vector.singleton (segmentId, ((segmentsCardinalities pma) Vector.! segmentId) + 1))
+            }
 
 addElement :: Vector String -> IO()
 addElement list = do
@@ -189,11 +249,7 @@ addElement list = do
     else
         undefined
 
-getElem :: Vector a -> Int -> a
-getElem vec i = vec Vector.! i
-
 run :: IO ()
 run = do
-  let vec = Vector.fromList [5, 6, 7]
   print "Hello, Azat!"
   -- addElement Vector.empty
