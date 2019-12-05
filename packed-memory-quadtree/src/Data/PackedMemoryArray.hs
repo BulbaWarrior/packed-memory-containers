@@ -189,23 +189,23 @@ spread pma elementsNum windowStart windowLength = pma
   , elements = newElements
   }
   where
-    -- windowEnd = windowStart + windowLength
-    -- tmp = getValidValues (subVector (elements pma) startPos len)
-    --   where
-    --     startPos = (segmentCapacity pma) * windowStart
-    --     len = (segmentCapacity pma) * windowLength
-    --
-    --     subVector :: Vector (Maybe a) -> Int -> Int -> Vector (Maybe a)
-    --     subVector vec start n = Vector.take n (Vector.drop start vec)
-    --
-    --     getValidValues :: Vector (Maybe a) -> Vector (Maybe a)
-    --     getValidValues vec
-    --       | null vec  = Vector.empty
-    --       | otherwise = takeIfValid (vec Vector.! 0) <> (Vector.drop 0 vec)
-    --       where
-    --         takeIfValid :: Maybe a -> Vector (Maybe a)
-    --         takeIfValid (Just val) = Vector.singleton (Just val)
-    --         takeIfValid _          = Vector.empty
+    windowEnd = windowStart + windowLength
+    tmp = getValidValues (subVector (elements pma) startPos len)
+      where
+        startPos = (segmentCapacity pma) * windowStart
+        len = (segmentCapacity pma) * windowLength
+
+        subVector :: Vector (Maybe a) -> Int -> Int -> Vector (Maybe a)
+        subVector vec start n = Vector.take n (Vector.drop start vec)
+
+        getValidValues :: Vector (Maybe a) -> Vector (Maybe a)
+        getValidValues vec
+          | null vec  = Vector.empty
+          | otherwise = takeIfValid (vec Vector.! 0) <> (Vector.drop 0 vec)
+          where
+            takeIfValid :: Maybe a -> Vector (Maybe a)
+            takeIfValid (Just val) = Vector.singleton (Just val)
+            takeIfValid _          = Vector.empty
 
     elementsPerSegment = elementsNum `div` windowLength
     oddSegmentsCnt = elementsNum `mod` windowLength
