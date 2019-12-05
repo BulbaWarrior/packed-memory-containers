@@ -23,6 +23,50 @@ samplePMA_1 = PMA
   , segmentsCardinalities = Vector.fromList [4, 0]
   }
 
+samplePMA_2 :: PMA Int
+samplePMA_2 = PMA
+  { capacity = 8,
+    segmentCapacity = 4,
+    height = 2,
+    elements = Vector.fromList
+      [ Just 1, Just 2, Nothing, Nothing
+      , Just 3, Just 4, Nothing, Nothing
+      ]
+    , cardinality = 4
+    , segmentsCnt = 2
+    , segmentsCardinalities = Vector.fromList [2,2]
+  }
+
+samplePMA_3 :: PMA Int
+samplePMA_3 = PMA
+  { capacity = 8,
+    segmentCapacity = 8,
+    height = 1,
+    elements = Vector.fromList
+      [ Just 1, Just 2, Just 3, Just 4
+      , Just 5, Just 6, Just 7, Nothing
+      ]
+    , cardinality = 7
+    , segmentsCnt = 1
+    , segmentsCardinalities = Vector.fromList [7]
+  }
+
+samplePMA_4 :: PMA Int
+samplePMA_4 = PMA
+  { capacity = 16
+  , segmentCapacity = 4
+  , height = 3
+  , elements = Vector.fromList
+      [ Just 1,Just 2,Nothing,Nothing
+      , Just 4,Just 5,Nothing,Nothing
+      , Just 6,Just 7,Nothing,Nothing
+      , Just 8,Just 9,Nothing,Nothing
+      ]
+  , cardinality = 8
+  , segmentsCnt = 4
+  , segmentsCardinalities = Vector.fromList [2,2,2,2]
+}
+
 data PMA a = PMA
   { capacity              :: Int                       -- total capacity of PMA
   , segmentCapacity       :: Int                -- the size of single segment
@@ -145,23 +189,23 @@ spread pma elementsNum windowStart windowLength = pma
   , elements = newElements
   }
   where
-    windowEnd = windowStart + windowLength
-    tmp = getValidValues (subVector (elements pma) startPos len)
-      where
-        startPos = (segmentCapacity pma) * windowStart
-        len = (segmentCapacity pma) * windowLength
-
-        subVector :: Vector (Maybe a) -> Int -> Int -> Vector (Maybe a)
-        subVector vec start n = Vector.take n (Vector.drop start vec)
-
-        getValidValues :: Vector (Maybe a) -> Vector (Maybe a)
-        getValidValues vec
-          | null vec  = Vector.empty
-          | otherwise = takeIfValid (vec Vector.! 0) <> (Vector.drop 0 vec)
-          where
-            takeIfValid :: Maybe a -> Vector (Maybe a)
-            takeIfValid (Just val) = Vector.singleton (Just val)
-            takeIfValid _          = Vector.empty
+    -- windowEnd = windowStart + windowLength
+    -- tmp = getValidValues (subVector (elements pma) startPos len)
+    --   where
+    --     startPos = (segmentCapacity pma) * windowStart
+    --     len = (segmentCapacity pma) * windowLength
+    --
+    --     subVector :: Vector (Maybe a) -> Int -> Int -> Vector (Maybe a)
+    --     subVector vec start n = Vector.take n (Vector.drop start vec)
+    --
+    --     getValidValues :: Vector (Maybe a) -> Vector (Maybe a)
+    --     getValidValues vec
+    --       | null vec  = Vector.empty
+    --       | otherwise = takeIfValid (vec Vector.! 0) <> (Vector.drop 0 vec)
+    --       where
+    --         takeIfValid :: Maybe a -> Vector (Maybe a)
+    --         takeIfValid (Just val) = Vector.singleton (Just val)
+    --         takeIfValid _          = Vector.empty
 
     elementsPerSegment = elementsNum `div` windowLength
     oddSegmentsCnt = elementsNum `mod` windowLength
@@ -236,14 +280,14 @@ findSegment pma val = if (isEmpty pma) then 0 else (find pma 0 ((segmentsCnt pma
                             else (mid + 1, ub)
 
 insert :: forall a. (Ord a, Show a) => PMA a -> a -> PMA a
-insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance pma segmentId) else newPMA
+insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance newPMA segmentId) else newPMA
   where
     segmentId = findSegment pma val
-    (elements', posToInsert) = traceShowId $ findPos (elements pma) ((segmentsCardinalities pma) Vector.! segmentId)
+    (elements', posToInsert) = findPos (elements pma) ((segmentsCardinalities pma) Vector.! segmentId)
       where
         findPos :: Vector (Maybe a) -> Int -> (Vector (Maybe a), Int)
         findPos vec pos = if (pos > 0) && ((Just val) < (vec Vector.! (pos - 1)))
-                        then findPos ((Vector.take (pos - 1) vec) Vector.++ (Vector.singleton Nothing) Vector.++ (Vector.singleton (vec Vector.! (pos - 1))) Vector.++ (Vector.drop pos (Vector.take (segmentCapacity pma) vec))) (pos - 1)
+                        then findPos (Vector.update vec (Vector.fromList [(pos - 1, Nothing), (pos, vec Vector.! (pos - 1))])) (pos - 1)
                         else (vec, pos)
 
     newElements = Vector.update elements' (Vector.singleton (posToInsert, Just val))
@@ -256,6 +300,11 @@ insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (seg
             , segmentsCnt = segmentsCnt pma
             , segmentsCardinalities = Vector.update (segmentsCardinalities pma) (Vector.singleton (segmentId, ((segmentsCardinalities pma) Vector.! segmentId) + 1))
             }
+
+find :: forall a. (Ord a) => PMA a -> a -> Maybe Int
+find pma val =  if Vector.elem (Just val) (elements pma)
+              then Vector.elemIndex (Just val) (elements pma)
+              else Just (-1)
 
 addElement :: Vector String -> IO()
 addElement list = do
