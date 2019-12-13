@@ -1,81 +1,30 @@
 {-# OPTIONS_GHC -fdefer-type-errors -Wall -fno-warn-type-defaults #-}
 {-# LANGUAGE DeriveFoldable      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+-- |
+-- TBD.
 module Data.PackedMemoryArray where
 
 import           Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import           Prelude
 
-import           Debug.Trace
+-- import           Debug.Trace
 
-samplePMA_1 :: PMA Int
-samplePMA_1 = PMA
-  { capacity = 8
-  , segmentCapacity = 4
-  , height = 2
-  , elements = Vector.fromList
-      [ Just 1, Just 2, Just 3, Just 4
-      , Nothing, Nothing, Nothing, Nothing
-      ]
-  , cardinality = 4
-  , segmentsCnt = 2
-  , segmentsCardinalities = Vector.fromList [4, 0]
-  }
+-- * PMA type
 
-samplePMA_2 :: PMA Int
-samplePMA_2 = PMA
-  { capacity = 8,
-    segmentCapacity = 4,
-    height = 2,
-    elements = Vector.fromList
-      [ Just 1, Just 2, Nothing, Nothing
-      , Just 3, Just 4, Nothing, Nothing
-      ]
-    , cardinality = 4
-    , segmentsCnt = 2
-    , segmentsCardinalities = Vector.fromList [2,2]
-  }
-
-samplePMA_3 :: PMA Int
-samplePMA_3 = PMA
-  { capacity = 8,
-    segmentCapacity = 8,
-    height = 1,
-    elements = Vector.fromList
-      [ Just 1, Just 2, Just 3, Just 4
-      , Just 5, Just 6, Just 7, Nothing
-      ]
-    , cardinality = 7
-    , segmentsCnt = 1
-    , segmentsCardinalities = Vector.fromList [7]
-  }
-
-samplePMA_4 :: PMA Int
-samplePMA_4 = PMA
-  { capacity = 16
-  , segmentCapacity = 4
-  , height = 3
-  , elements = Vector.fromList
-      [ Just 1,Just 2,Nothing,Nothing
-      , Just 4,Just 5,Nothing,Nothing
-      , Just 6,Just 7,Nothing,Nothing
-      , Just 8,Just 9,Nothing,Nothing
-      ]
-  , cardinality = 8
-  , segmentsCnt = 4
-  , segmentsCardinalities = Vector.fromList [2,2,2,2]
-}
-
+-- | Packed-memory array.
 data PMA a = PMA
-  { capacity              :: Int                       -- total capacity of PMA
-  , segmentCapacity       :: Int                -- the size of single segment
-  , height                :: Int                         -- the height of the binary tree for elements
-  , elements              :: Vector (Maybe a)          -- the elements contained
-  , cardinality           :: Int                    -- the number of elements contained
-  , segmentsCnt           :: Int                    -- the number of segments
-  , segmentsCardinalities :: Vector Int   -- the number of elements contained in current segment
+  { capacity              :: Int              -- ^ Total capacity of PMA.
+  , segmentCapacity       :: Int              -- ^ Size of each segment.
+  , height                :: Int              -- ^ Height of the binary tree for elements.
+  , elements              :: Vector (Maybe a) -- ^ Vector of all cells (elements or gaps).
+  , cardinality           :: Int              -- ^ Number of elements contained.
+  , segmentsCnt           :: Int              -- ^ Number of segments
+  , segmentsCardinalities :: Vector Int       -- ^ Number of elements contained in each segment.
   } deriving (Show, Eq, Foldable)
+
+-- * Constants
 
 minCapacity :: Int
 minCapacity = 8
@@ -92,12 +41,7 @@ p_h = 0.5
 -- p_0 :: Double
 -- p_0 = 0.1
 
-log2 :: Int -> Double
-log2 value = logBase 2 (fromIntegral value)
-
--- Round up to closest power of 2
-hyperceil :: Int -> Int
-hyperceil value = 2 ^ (ceiling (log2 value))
+-- * Construction
 
 -- init PMA with given capacity
 initPMA :: Int -> PMA a
@@ -111,19 +55,66 @@ initPMA c = PMA
   , segmentsCardinalities = Vector.singleton 0
   }
 
+
+-- | Empty packed-memory array.
+--
+-- prop> capacity emptyPMA == minCapacity
+emptyPMA :: PMA a
+emptyPMA = initPMA minCapacity
+
+-- * Insertion
+
+-- | Worst case: \(O(n)\).
+--
+-- Insert an element into a packed-memory array.
+insert :: forall a. (Ord a, Show a) => PMA a -> a -> PMA a
+insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance newPMA segmentId) else newPMA
+  where
+    segmentId = findSegment pma val
+    (elements', posToInsert) = findPos (elements pma) ((segmentsCardinalities pma) Vector.! segmentId)
+      where
+        findPos :: Vector (Maybe a) -> Int -> (Vector (Maybe a), Int)
+        findPos vec pos = if (pos > 0) && ((Just val) < (vec Vector.! (pos - 1)))
+                        then findPos (Vector.update vec (Vector.fromList [(pos - 1, Nothing), (pos, vec Vector.! (pos - 1))])) (pos - 1)
+                        else (vec, pos)
+
+    newElements = Vector.update elements' (Vector.singleton (posToInsert, Just val))
+    newPMA = PMA
+            { capacity = capacity pma
+            , segmentCapacity = segmentCapacity pma
+            , height = height pma
+            , elements = newElements
+            , cardinality = (cardinality pma) + 1
+            , segmentsCnt = segmentsCnt pma
+            , segmentsCardinalities = Vector.update (segmentsCardinalities pma) (Vector.singleton (segmentId, ((segmentsCardinalities pma) Vector.! segmentId) + 1))
+            }
+
+-- * Delete/Update
+
 setElement :: PMA a -> Int -> Maybe a -> PMA a
 setElement pma pos v = pma
   { elements = Vector.update (elements pma) (Vector.fromList [(pos, v)]) }
 
--- init empty PMA (capacity == minCapacity)
-emptyPMA :: PMA a
-emptyPMA = initPMA minCapacity
+clearPMA :: PMA a -> PMA a
+clearPMA _ = emptyPMA
+
+-- * Query
 
 isEmpty :: PMA a -> Bool
 isEmpty pma = (cardinality pma) == 0
 
-clearPMA :: PMA a -> PMA a
-clearPMA _ = emptyPMA
+-- | TODO: switch to binsearch.
+elemIndex :: Eq a => a -> PMA a -> Maybe Int
+elemIndex pma val = Just val `Vector.elemIndex` elements pma
+
+-- * Helpers
+
+log2 :: Int -> Double
+log2 value = logBase 2 (fromIntegral value)
+
+-- Round up to closest power of 2
+hyperceil :: Int -> Int
+hyperceil value = 2 ^ (ceiling (log2 value))
 
 -- Get the lower and upper segments for the given segment_id at the given level
 -- level >= 1
@@ -279,32 +270,65 @@ findSegment pma val = if (isEmpty pma) then 0 else (find pma 0 ((segmentsCnt pma
                             then (mid, mid)
                             else (mid + 1, ub)
 
-insert :: forall a. (Ord a, Show a) => PMA a -> a -> PMA a
-insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance newPMA segmentId) else newPMA
-  where
-    segmentId = findSegment pma val
-    (elements', posToInsert) = findPos (elements pma) ((segmentsCardinalities pma) Vector.! segmentId)
-      where
-        findPos :: Vector (Maybe a) -> Int -> (Vector (Maybe a), Int)
-        findPos vec pos = if (pos > 0) && ((Just val) < (vec Vector.! (pos - 1)))
-                        then findPos (Vector.update vec (Vector.fromList [(pos - 1, Nothing), (pos, vec Vector.! (pos - 1))])) (pos - 1)
-                        else (vec, pos)
+-- * Tests
 
-    newElements = Vector.update elements' (Vector.singleton (posToInsert, Just val))
-    newPMA = PMA
-            { capacity = capacity pma
-            , segmentCapacity = segmentCapacity pma
-            , height = height pma
-            , elements = newElements
-            , cardinality = (cardinality pma) + 1
-            , segmentsCnt = segmentsCnt pma
-            , segmentsCardinalities = Vector.update (segmentsCardinalities pma) (Vector.singleton (segmentId, ((segmentsCardinalities pma) Vector.! segmentId) + 1))
-            }
+samplePMA_1 :: PMA Int
+samplePMA_1 = PMA
+  { capacity = 8
+  , segmentCapacity = 4
+  , height = 2
+  , elements = Vector.fromList
+      [ Just 1, Just 2, Just 3, Just 4
+      , Nothing, Nothing, Nothing, Nothing
+      ]
+  , cardinality = 4
+  , segmentsCnt = 2
+  , segmentsCardinalities = Vector.fromList [4, 0]
+  }
 
-find :: forall a. (Ord a) => PMA a -> a -> Maybe Int
-find pma val =  if Vector.elem (Just val) (elements pma)
-              then Vector.elemIndex (Just val) (elements pma)
-              else Just (-1)
+samplePMA_2 :: PMA Int
+samplePMA_2 = PMA
+  { capacity = 8,
+    segmentCapacity = 4,
+    height = 2,
+    elements = Vector.fromList
+      [ Just 1, Just 2, Nothing, Nothing
+      , Just 3, Just 4, Nothing, Nothing
+      ]
+    , cardinality = 4
+    , segmentsCnt = 2
+    , segmentsCardinalities = Vector.fromList [2,2]
+  }
+
+samplePMA_3 :: PMA Int
+samplePMA_3 = PMA
+  { capacity = 8,
+    segmentCapacity = 8,
+    height = 1,
+    elements = Vector.fromList
+      [ Just 1, Just 2, Just 3, Just 4
+      , Just 5, Just 6, Just 7, Nothing
+      ]
+    , cardinality = 7
+    , segmentsCnt = 1
+    , segmentsCardinalities = Vector.fromList [7]
+  }
+
+samplePMA_4 :: PMA Int
+samplePMA_4 = PMA
+  { capacity = 16
+  , segmentCapacity = 4
+  , height = 3
+  , elements = Vector.fromList
+      [ Just 1,Just 2,Nothing,Nothing
+      , Just 4,Just 5,Nothing,Nothing
+      , Just 6,Just 7,Nothing,Nothing
+      , Just 8,Just 9,Nothing,Nothing
+      ]
+  , cardinality = 8
+  , segmentsCnt = 4
+  , segmentsCardinalities = Vector.fromList [2,2,2,2]
+}
 
 addElement :: Vector String -> IO()
 addElement list = do
