@@ -1,23 +1,29 @@
-name:                packed-memory-quadtree
+name:                packed-memory-containers
 version:             0.1.0.0
-github:              "githubuser/packed-memory-quadtree"
+github:              "fizruk/packed-memory-containers"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2019 Author name here"
+author:              "Nikolai Kudasov, Niyaz Fahretdinov, Azat Sultanov"
+maintainer:          "n.kudasov@innopolis.ru"
+copyright:           "2019-2020 Innopolis University"
 
 extra-source-files:
 - README.md
 - ChangeLog.md
 
 # Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
+synopsis:            Cache-oblivious efficient packed-memory containers
+category:            Data
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/packed-memory-quadtree#readme>
+description:         Please see the README on GitHub at <https://github.com/fizruk/packed-memory-containers#readme>
+
+custom-setup:
+  dependencies:
+    - base
+    - Cabal
+    - cabal-doctest >=1.0.2 && <1.1
 
 dependencies:
 - base >= 4.7 && < 5
@@ -27,14 +33,8 @@ dependencies:
 library:
   source-dirs: src
 
-executables:
-  pma-exe:
-    main:                Setup.hs
-    dependencies:
-    - packed-memory-quadtree
-
 tests:
-  packed-memory-quadtree-test:
+  spec:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -42,4 +42,15 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - packed-memory-quadtree
+    - packed-memory-containers
+
+  doctests:
+    source-dirs: test
+    main: doctests.hs
+    other-modules: []
+    dependencies:
+    - base
+    - doctest
+    - Glob
+    - QuickCheck
+    - template-haskell

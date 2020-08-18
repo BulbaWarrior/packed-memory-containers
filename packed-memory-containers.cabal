@@ -1,0 +1,80 @@
+cabal-version: 1.24
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: c3f6fbb25e8942e20568ac40365a02f4389a405288e4101ffa458541255cab3c
+
+name:           packed-memory-containers
+version:        0.1.0.0
+synopsis:       Cache-oblivious efficient packed-memory containers
+description:    Please see the README on GitHub at <https://github.com/fizruk/packed-memory-containers#readme>
+category:       Data
+homepage:       https://github.com/fizruk/packed-memory-containers#readme
+bug-reports:    https://github.com/fizruk/packed-memory-containers/issues
+author:         Nikolai Kudasov, Niyaz Fahretdinov, Azat Sultanov
+maintainer:     n.kudasov@innopolis.ru
+copyright:      2019-2020 Innopolis University
+license:        BSD3
+license-file:   LICENSE
+build-type:     Custom
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/fizruk/packed-memory-containers
+
+custom-setup
+  setup-depends:
+      Cabal
+    , base
+    , cabal-doctest >=1.0.2 && <1.1
+
+library
+  exposed-modules:
+      Data.PackedMemoryArray
+      Data.PackedMemoryQuadtree
+      Data.PMA
+      Data.PMA.Mutable
+  other-modules:
+      Paths_packed_memory_containers
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , primitive
+    , vector
+  default-language: Haskell2010
+
+test-suite doctests
+  type: exitcode-stdio-1.0
+  main-is: doctests.hs
+  hs-source-dirs:
+      test
+  build-depends:
+      Glob
+    , QuickCheck
+    , base
+    , doctest
+    , primitive
+    , template-haskell
+    , vector
+  default-language: Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_packed_memory_containers
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , packed-memory-containers
+    , primitive
+    , vector
+  default-language: Haskell2010
