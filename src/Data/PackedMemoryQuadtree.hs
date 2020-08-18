@@ -9,6 +9,10 @@ import qualified Data.Vector  as Vector
 import           GHC.TypeLits (KnownNat, Nat)
 import           Numeric      (readInt, showIntAtBase)
 
+-- $setup
+-- >>> :set -XTypeApplications
+-- >>> :set -XDataKinds
+
 data Coords (n :: Nat) = Coords Int Int
 
 newtype ZIndex (n :: Nat) = ZIndex Int
