@@ -43,6 +43,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - packed-memory-containers
+    - QuickCheck
 
   doctests:
     source-dirs: test

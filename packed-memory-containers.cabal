@@ -4,7 +4,7 @@ cabal-version: 1.24
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c3f6fbb25e8942e20568ac40365a02f4389a405288e4101ffa458541255cab3c
+-- hash: eb822110c4aad4b12a88b985046dc6609431acb57fd375545a8d84c352654619
 
 name:           packed-memory-containers
 version:        0.1.0.0
@@ -73,7 +73,8 @@ test-suite spec
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      QuickCheck
+    , base >=4.7 && <5
     , packed-memory-containers
     , primitive
     , vector
