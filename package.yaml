@@ -42,6 +42,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - hspec
     - packed-memory-containers
     - QuickCheck
 
