@@ -14,14 +14,14 @@ spec :: Spec
 spec 
   = do
     describe "PMA" $ do
-      it "is always sorted" $ 
-        property $ prop_sorted emptyPMA
+      it "is always sorted"
+        $ property $ prop_sorted emptyPMA
 
-      it "'s total cardinality is always equal to its segment cardinalities sum" $
-        property $ prop_cardinalities emptyPMA
+      it "'s total cardinality is always equal to its segment cardinalities sum"
+        $ property $ prop_totalSegmentCardinalities emptyPMA
 
-      it "'s nonempy slots counts should be equal to its cardinality" $
-        property $ prop_elements_count emptyPMA
+      it "'s nonempy slots counts should be equal to its cardinality"
+        $ property $ prop_elementsCount emptyPMA
 
 
 -- | Repsents a possible operations over a PMA
@@ -58,20 +58,24 @@ prop_sorted initial operations = sort asList == asList
 
 
 -- | Applies given operations to given PMA
--- and then checks its cardinalities
-prop_cardinalities :: (Integral a, Show a, Ord a)
+-- and then checks if segments cardinalities 
+-- add up to total cardinality
+prop_totalSegmentCardinalities :: (Integral a, Show a, Ord a)
                       => PMA a -> [Operation a] -> Bool
-prop_cardinalities initial operations = card == sum cards
-    where
-      pma = construct initial operations
-      card = cardinality pma
-      cards = segmentsCardinalities pma
+prop_totalSegmentCardinalities initial operations = card == sum cards
+  where
+    pma = construct initial operations
+    card = cardinality pma
+    cards = segmentsCardinalities pma
 
 
-prop_elements_count :: (Integral a, Show a, Ord a)
+-- | Applies given operations to given PMA
+-- and then checks if total cardinality
+-- is equal to actual elements number inside the pma
+prop_elementsCount :: (Integral a, Show a, Ord a)
                     => PMA a -> [Operation a] -> Bool
-prop_elements_count initial operations = count == length filteredElems
-    where
-      pma = construct initial operations
-      filteredElems = Vector.filter isJust (elements pma)
-      count = cardinality pma
+prop_elementsCount initial operations = count == length filteredElems
+  where
+    pma = construct initial operations
+    filteredElems = Vector.filter isJust (elements pma)
+    count = cardinality pma
