@@ -4,7 +4,7 @@ cabal-version: 1.24
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c3f6fbb25e8942e20568ac40365a02f4389a405288e4101ffa458541255cab3c
+-- hash: df784893d6d32e38a22c5cc1be61d2febd83a1767903290f98fca93644d93c97
 
 name:           packed-memory-containers
 version:        0.1.0.0
@@ -68,12 +68,15 @@ test-suite spec
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Data.PackedMemoryArraySpec
       Paths_packed_memory_containers
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      QuickCheck
+    , base >=4.7 && <5
+    , hspec
     , packed-memory-containers
     , primitive
     , vector

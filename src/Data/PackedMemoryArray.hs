@@ -7,6 +7,7 @@ module Data.PackedMemoryArray where
 
 import           Data.Vector (Vector)
 import qualified Data.Vector as Vector
+import           Data.Maybe (isJust)
 import           Prelude
 
 -- import           Debug.Trace
@@ -71,7 +72,8 @@ insert :: forall a. (Ord a, Show a) => PMA a -> a -> PMA a
 insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance newPMA segmentId) else newPMA
   where
     segmentId = findSegment pma val
-    (elements', posToInsert) = findPos (elements pma) ((segmentsCardinalities pma) Vector.! segmentId)
+
+    (elements', posToInsert) = findPos (elements pma) ((segmentCapacity pma)*(segmentId) + ((segmentsCardinalities pma) Vector.! segmentId))
       where
         findPos :: Vector (Maybe a) -> Int -> (Vector (Maybe a), Int)
         findPos vec pos = if (pos > 0) && ((Just val) < (vec Vector.! (pos - 1)))
@@ -79,6 +81,7 @@ insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (seg
                         else (vec, pos)
 
     newElements = Vector.update elements' (Vector.singleton (posToInsert, Just val))
+
     newPMA = PMA
             { capacity = capacity pma
             , segmentCapacity = segmentCapacity pma
@@ -161,7 +164,7 @@ resize pma = PMA
             | i < oddSegmentsCnt  = (Vector.singleton (elementsPerSegment + 1)) <> (getSegmentsCardinalities (i + 1))
             | otherwise           = (Vector.singleton elementsPerSegment) <> (getSegmentsCardinalities (i + 1))
 
-      newElements = getElements (elements pma) newSegmentsCardinalities
+      newElements = getElements (Vector.filter isJust (elements pma)) newSegmentsCardinalities
         where
           getElements :: Vector (Maybe a) -> Vector Int -> Vector (Maybe a)
           getElements elems sizes
@@ -181,6 +184,7 @@ spread pma elementsNum windowStart windowLength = pma
   }
   where
     windowEnd = windowStart + windowLength
+
     tmp = getValidValues (subVector (elements pma) startPos len)
       where
         startPos = (segmentCapacity pma) * windowStart
@@ -190,13 +194,7 @@ spread pma elementsNum windowStart windowLength = pma
         subVector vec start n = Vector.take n (Vector.drop start vec)
 
         getValidValues :: Vector (Maybe a) -> Vector (Maybe a)
-        getValidValues vec
-          | null vec  = Vector.empty
-          | otherwise = takeIfValid (vec Vector.! 0) <> (Vector.drop 0 vec)
-          where
-            takeIfValid :: Maybe a -> Vector (Maybe a)
-            takeIfValid (Just val) = Vector.singleton (Just val)
-            takeIfValid _          = Vector.empty
+        getValidValues v = Vector.filter isJust v
 
     elementsPerSegment = elementsNum `div` windowLength
     oddSegmentsCnt = elementsNum `mod` windowLength
@@ -209,7 +207,7 @@ spread pma elementsNum windowStart windowLength = pma
           | i < oddSegmentsCnt  = (Vector.singleton (elementsPerSegment + 1)) <> (getSegmentsCardinalities (i + 1))
           | otherwise           = (Vector.singleton elementsPerSegment) <> (getSegmentsCardinalities (i + 1))
 
-    newSubElements = getElements (elements pma) newSubSegmentsCardinalities
+    newSubElements = getElements tmp newSubSegmentsCardinalities
       where
         getElements :: Vector (Maybe a) -> Vector Int -> Vector (Maybe a)
         getElements elems sizes
@@ -247,13 +245,14 @@ rebalance pma segmentId = rebalancedPMA
             windowStart = windowId * windowLength --inclusive
             windowEnd = windowStart + windowLength --exclusive
             (p_l, t_l) = windowThresholds pma l
-            prefixSums = Vector.postscanl (+) 0 (segmentsCardinalities pma)
-            elementsCnt = if (windowStart == 0)
-                        then (prefixSums Vector.! (windowEnd - 1))
-                        else ((prefixSums Vector.! (windowEnd - 1)) - (prefixSums Vector.! windowStart))
+            -- todo rewrite more optimised...
+            elementsCnt = sum (Vector.take windowLength (Vector.drop windowStart (segmentsCardinalities pma)))
+            
             density = (fromIntegral elementsCnt) / (fromIntegral (windowLength * (segmentCapacity pma)))
 
-    rebalancedPMA = if (newDensity >= t_l) then (resize pma) else (spread pma elementsCnt windowStart windowLength)
+    rebalancedPMA = if (newDensity >= t_l) 
+      then resize pma
+      else spread pma elementsCnt windowStart windowLength
 
 
 
