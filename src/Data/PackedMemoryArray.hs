@@ -9,7 +9,6 @@ import           Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import           Data.Maybe (isJust)
 import           Prelude
-import Debug.Trace
 
 -- import           Debug.Trace
 
@@ -196,15 +195,6 @@ spread pma elementsNum windowStart windowLength = pma
 
         getValidValues :: Vector (Maybe a) -> Vector (Maybe a)
         getValidValues v = Vector.filter isJust v
-        -- Todo rewrite more optimised, it's O(n^2)
-        -- getValidValues :: Vector (Maybe a) -> Vector (Maybe a)
-        -- getValidValues vec
-        --   | null vec  = Vector.empty
-        --   | otherwise = takeIfValid (vec Vector.! 0) <> getValidValues (Vector.drop 0 vec)
-        --   where
-        --     takeIfValid :: Maybe a -> Vector (Maybe a)
-        --     takeIfValid (Just val) = Vector.singleton (Just val)
-        --     takeIfValid _          = Vector.empty
 
     elementsPerSegment = elementsNum `div` windowLength
     oddSegmentsCnt = elementsNum `mod` windowLength
@@ -217,7 +207,7 @@ spread pma elementsNum windowStart windowLength = pma
           | i < oddSegmentsCnt  = (Vector.singleton (elementsPerSegment + 1)) <> (getSegmentsCardinalities (i + 1))
           | otherwise           = (Vector.singleton elementsPerSegment) <> (getSegmentsCardinalities (i + 1))
 
-    newSubElements = getElements (tmp) newSubSegmentsCardinalities
+    newSubElements = getElements tmp newSubSegmentsCardinalities
       where
         getElements :: Vector (Maybe a) -> Vector Int -> Vector (Maybe a)
         getElements elems sizes
@@ -241,7 +231,7 @@ spread pma elementsNum windowStart windowLength = pma
           (Vector.take startPos origVector) <> newSubVector <> (Vector.drop (startPos + (Vector.length newSubVector)) origVector)
 
 
-rebalance :: (Show a) => PMA a -> Int -> PMA a
+rebalance :: PMA a -> Int -> PMA a
 rebalance pma segmentId = rebalancedPMA
   where
     (newDensity, t_l, elementsCnt, windowStart, windowLength) =
@@ -255,12 +245,9 @@ rebalance pma segmentId = rebalancedPMA
             windowStart = windowId * windowLength --inclusive
             windowEnd = windowStart + windowLength --exclusive
             (p_l, t_l) = windowThresholds pma l
-            -- prefixSums = Vector.postscanl (+) 0 (segmentsCardinalities pma)
-            -- elementsCnt = if (windowStart == 0)
-            --             then (prefixSums Vector.! (windowEnd - 1))
-            --             else ((prefixSums Vector.! (windowEnd - 1)) - (prefixSums Vector.! windowStart))
+            -- todo rewrite more optimised...
             elementsCnt = sum (Vector.take windowLength (Vector.drop windowStart (segmentsCardinalities pma)))
-            -- ^ todo rewrite more optimised...
+            
             density = (fromIntegral elementsCnt) / (fromIntegral (windowLength * (segmentCapacity pma)))
 
     rebalancedPMA = if (newDensity >= t_l) 
