@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fdefer-type-errors -Wall -fno-warn-type-defaults #-}
+{-# OPTIONS_GHC -Wall -fno-warn-type-defaults #-}
 {-# LANGUAGE DeriveFoldable      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- |
@@ -7,7 +7,7 @@ module Data.PackedMemoryArray where
 
 import           Data.Vector (Vector)
 import qualified Data.Vector as Vector
-import           Data.Maybe (isJust)
+import           Data.Maybe (isJust, fromMaybe, catMaybes)
 import           Prelude
 
 -- import           Debug.Trace
@@ -106,9 +106,24 @@ clearPMA _ = emptyPMA
 isEmpty :: PMA a -> Bool
 isEmpty pma = (cardinality pma) == 0
 
--- | TODO: switch to binsearch.
-elemIndex :: Eq a => a -> PMA a -> Maybe Int
-elemIndex pma val = Just val `Vector.elemIndex` elements pma
+
+elemIndex :: Ord a => a -> PMA a -> Maybe Int
+elemIndex val pma
+  | elementsVector Vector.!? index == Just (Just val) = Just index
+  | otherwise                                         = Nothing
+  where
+    elementsVector = elements pma
+    index = findPlaceIndex val pma
+
+
+-- | Return all elements in range [start, end)
+findInRange :: Ord a => (a, a) -> PMA a -> [a]
+findInRange (start, end) pma = catMaybes (Vector.toList slice)
+  where
+    startInd = findPlaceIndex start pma
+    endInd   = findPlaceIndex end pma
+    slice = Vector.slice startInd (endInd - startInd) (elements pma)
+
 
 -- * Helpers
 
@@ -268,6 +283,21 @@ findSegment pma val = if (isEmpty pma) then 0 else (find pma 0 ((segmentsCnt pma
                         else  if ((Just val) <= ((elements pma) Vector.! ((mid * (segmentCapacity pma)) + ((segmentsCardinalities pma) Vector.! mid) - 1)))
                             then (mid, mid)
                             else (mid + 1, ub)
+
+-- todo write tests for this
+-- | finds index where an element should be put
+-- complexity – O (log (n / log n) + log n) = O (2 log (n) - log log n)
+-- replace linear search to binary – get O (log (n / log n) + log log n) = O (log n)
+findPlaceIndex :: Ord a => a -> PMA a -> Int
+findPlaceIndex val pma = start + linSearch (Vector.slice start len (elements pma))
+  where
+    segmentId = findSegment pma val
+    start = segmentId * segmentCapacity pma
+    len = segmentsCardinalities pma Vector.! segmentId
+    
+    linSearch slice = fromMaybe
+        (length slice - 1)
+        (Vector.findIndex (>= Just val) slice)
 
 -- * Tests
 
