@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Data.PackedMemoryArraySpec where
 
 import           Data.PackedMemoryArray
@@ -25,43 +26,43 @@ spec
 
 
 -- | Repsents a possible operations over a PMA
-data Operation a = Insert a 
+data Operation k a = Insert k a
   deriving (Eq, Show)
 
 -- | Applies given operation to given PMA
-apply :: (Ord a, Show a) => Operation a -> PMA a -> PMA a
-apply (Insert a) pma = insert pma a
+apply :: (Ord k) => Operation k a -> PMA k a -> PMA k a
+apply (Insert k a) pma = insert (k, a) pma
 
 -- | Applies all the operations from list to given PMA
 -- from right to left
-construct :: (Ord a, Show a) => PMA a -> [Operation a] -> PMA a
-construct = foldr apply 
+construct :: (Ord k) => PMA k a -> [Operation k a] -> PMA k a
+construct = foldr apply
 
 
 -- | Generates an Insert Opertion.
-instance (Integral a) => Arbitrary (Operation a) where
+instance (Integral k, Show k) => Arbitrary (Operation k String) where
   arbitrary = do
     x <- choose(-1000, 1000) :: Gen Int
 
-    return $ Insert (fromIntegral x)
-
+    return $ Insert (fromIntegral x) (show x)
 
 
 -- | Applies given operations to given PMA
 -- and then checks its elements for being sorted.
-prop_sorted :: (Integral a, Show a, Ord a) 
-                => PMA a -> [Operation a] -> Bool
-prop_sorted initial operations = sort asList == asList
+prop_sorted :: (Integral k, Show k, Ord k) 
+                => PMA k String -> [Operation k String] -> Bool
+prop_sorted initial operations = sort keys == keys
   where
     pma = construct initial operations
     asList = catMaybes (Vector.toList (elements pma))
+    keys = fmap fst asList -- todo get keys
 
 
 -- | Applies given operations to given PMA
 -- and then checks if segments cardinalities 
 -- add up to total cardinality
-prop_totalSegmentCardinalities :: (Integral a, Show a, Ord a)
-                      => PMA a -> [Operation a] -> Bool
+prop_totalSegmentCardinalities :: (Integral k, Show k, Ord k)
+                      => PMA k String -> [Operation k String] -> Bool
 prop_totalSegmentCardinalities initial operations = card == sum cards
   where
     pma = construct initial operations
@@ -72,8 +73,8 @@ prop_totalSegmentCardinalities initial operations = card == sum cards
 -- | Applies given operations to given PMA
 -- and then checks if total cardinality
 -- is equal to actual elements number inside the pma
-prop_elementsCount :: (Integral a, Show a, Ord a)
-                    => PMA a -> [Operation a] -> Bool
+prop_elementsCount :: (Integral k, Show k, Ord k)
+                    => PMA k String -> [Operation k String] -> Bool
 prop_elementsCount initial operations = count == length filteredElems
   where
     pma = construct initial operations

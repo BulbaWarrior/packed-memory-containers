@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall -fno-warn-type-defaults #-}
+{-# OPTIONS_GHC -Wall -fdefer-typed-holes -fno-warn-type-defaults #-}
 {-# LANGUAGE DeriveFoldable      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- |
@@ -15,11 +15,11 @@ import           Prelude
 -- * PMA type
 
 -- | Packed-memory array.
-data PMA a = PMA
+data PMA k v = PMA
   { capacity              :: Int              -- ^ Total capacity of PMA.
   , segmentCapacity       :: Int              -- ^ Size of each segment.
   , height                :: Int              -- ^ Height of the binary tree for elements.
-  , elements              :: Vector (Maybe a) -- ^ Vector of all cells (elements or gaps).
+  , elements              :: Vector (Maybe (k, v)) -- ^ Vector of all cells (elements or gaps).
   , cardinality           :: Int              -- ^ Number of elements contained.
   , segmentsCnt           :: Int              -- ^ Number of segments
   , segmentsCardinalities :: Vector Int       -- ^ Number of elements contained in each segment.
@@ -45,7 +45,7 @@ p_h = 0.5
 -- * Construction
 
 -- init PMA with given capacity
-initPMA :: Int -> PMA a
+initPMA :: Int -> PMA k a
 initPMA c = PMA
   { capacity = hyperceil c
   , segmentCapacity = hyperceil c
@@ -60,7 +60,7 @@ initPMA c = PMA
 -- | Empty packed-memory array.
 --
 -- prop> capacity emptyPMA == minCapacity
-emptyPMA :: PMA a
+emptyPMA :: PMA k a
 emptyPMA = initPMA minCapacity
 
 -- * Insertion
@@ -68,19 +68,19 @@ emptyPMA = initPMA minCapacity
 -- | Worst case: \(O(n)\).
 --
 -- Insert an element into a packed-memory array.
-insert :: forall a. (Ord a, Show a) => PMA a -> a -> PMA a
-insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance newPMA segmentId) else newPMA
+insert :: forall k a. (Ord k) => (k, a) -> PMA k a -> PMA k a
+insert (key, val) pma = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance newPMA segmentId) else newPMA
   where
-    segmentId = findSegment pma val
+    segmentId = findSegment pma key
 
     (elements', posToInsert) = findPos (elements pma) ((segmentCapacity pma)*(segmentId) + ((segmentsCardinalities pma) Vector.! segmentId))
       where
-        findPos :: Vector (Maybe a) -> Int -> (Vector (Maybe a), Int)
-        findPos vec pos = if (pos > 0) && ((Just val) < (vec Vector.! (pos - 1)))
+        findPos :: Vector (Maybe (k, a)) -> Int -> (Vector (Maybe (k, a)), Int)
+        findPos vec pos = if (pos > 0) && ((Just key) < fmap fst (vec Vector.! (pos - 1)))
                         then findPos (Vector.update vec (Vector.fromList [(pos - 1, Nothing), (pos, vec Vector.! (pos - 1))])) (pos - 1)
                         else (vec, pos)
 
-    newElements = Vector.update elements' (Vector.singleton (posToInsert, Just val))
+    newElements = Vector.update elements' (Vector.singleton (posToInsert, Just (key, val)))
 
     newPMA = PMA
             { capacity = capacity pma
@@ -92,32 +92,26 @@ insert pma val = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (seg
             , segmentsCardinalities = Vector.update (segmentsCardinalities pma) (Vector.singleton (segmentId, ((segmentsCardinalities pma) Vector.! segmentId) + 1))
             }
 
--- * Delete/Update
-
-setElement :: PMA a -> Int -> Maybe a -> PMA a
-setElement pma pos v = pma
-  { elements = Vector.update (elements pma) (Vector.fromList [(pos, v)]) }
-
-clearPMA :: PMA a -> PMA a
-clearPMA _ = emptyPMA
 
 -- * Query
 
-isEmpty :: PMA a -> Bool
+isEmpty :: PMA k a -> Bool
 isEmpty pma = (cardinality pma) == 0
 
 
-elemIndex :: Ord a => a -> PMA a -> Maybe Int
-elemIndex val pma
-  | elementsVector Vector.!? index == Just (Just val) = Just index
-  | otherwise                                         = Nothing
+find :: Ord k => k -> PMA k a -> Maybe a
+find key pma = do
+      Just (k, v) <- elementsVector Vector.!? index
+      if k == key
+        then Just v
+        else Nothing
   where
     elementsVector = elements pma
-    index = findPlaceIndex val pma
+    index = findPlaceIndex key pma
 
 
 -- | Return all elements in range [start, end)
-findInRange :: Ord a => (a, a) -> PMA a -> [a]
+findInRange :: Ord k => (k, k) -> PMA k a -> [(k, a)]
 findInRange (start, end) pma = catMaybes (Vector.toList slice)
   where
     startInd = findPlaceIndex start pma
@@ -137,7 +131,7 @@ hyperceil value = 2 ^ (ceiling (log2 value))
 -- Get the lower and upper segments for the given segment_id at the given level
 -- level >= 1
 -- (l, r) both inclusive
-windowBounds :: PMA a -> Int -> Int -> (Int, Int)
+windowBounds :: PMA a k -> Int -> Int -> (Int, Int)
 windowBounds pma pos level = (l, r)
   where
     windowCapacity = (segmentCapacity pma) * (2 ^ (level - 1))
@@ -146,7 +140,7 @@ windowBounds pma pos level = (l, r)
 
 -- Get the lower (p_l) and upper (t_l) threshold for the windows at the given level
 -- level >= 1
-windowThresholds :: PMA a -> Int -> (Double, Double)
+windowThresholds :: PMA a k -> Int -> (Double, Double)
 windowThresholds pma level = (p_l, t_l)
   where
     h = height pma
@@ -154,7 +148,7 @@ windowThresholds pma level = (p_l, t_l)
     p_l = p_h - 0.25 * diff
     t_l = t_h + 0.25 * diff
 
-resize :: PMA a -> PMA a
+resize :: PMA a k -> PMA a k
 resize pma = PMA
   { capacity = newCapacity
   , segmentCapacity = newSegmentCapacity
@@ -192,7 +186,7 @@ resize pma = PMA
 
 
 -- Equally spread the elements in the interval [segmentCapacity * windowStart, segmentCapacity * (windowStart + windowLength) )
-spread :: PMA a -> Int -> Int -> Int -> PMA a
+spread :: PMA k v -> Int -> Int -> Int -> PMA k v
 spread pma elementsNum windowStart windowLength = pma
   { segmentsCardinalities = newSegmentsCardinalities
   , elements = newElements
@@ -246,7 +240,7 @@ spread pma elementsNum windowStart windowLength = pma
           (Vector.take startPos origVector) <> newSubVector <> (Vector.drop (startPos + (Vector.length newSubVector)) origVector)
 
 
-rebalance :: PMA a -> Int -> PMA a
+rebalance :: PMA k v -> Int -> PMA k v
 rebalance pma segmentId = rebalancedPMA
   where
     (newDensity, t_l, elementsCnt, windowStart, windowLength) =
@@ -271,16 +265,16 @@ rebalance pma segmentId = rebalancedPMA
 
 
 
-findSegment :: forall a. Ord a => PMA a -> a -> Int
+findSegment :: forall k v. Ord k => PMA k v -> k -> Int
 findSegment pma val = if (isEmpty pma) then 0 else (find pma 0 ((segmentsCnt pma) - 1))
   where
-    find :: PMA a -> Int -> Int -> Int
+    find :: PMA k v -> Int -> Int -> Int
     find pma lb ub = if (lb < ub) then (find pma newLB newUB) else lb
       where
         mid = (lb + ub) `div` 2
-        (newLB, newUB) =  if ((Just val) < ((elements pma) Vector.! (mid * (segmentCapacity pma))))
+        (newLB, newUB) =  if ((Just val) < fmap fst ((elements pma) Vector.! (mid * (segmentCapacity pma))))
                         then (lb, mid - 1)
-                        else  if ((Just val) <= ((elements pma) Vector.! ((mid * (segmentCapacity pma)) + ((segmentsCardinalities pma) Vector.! mid) - 1)))
+                        else  if ((Just val) <= fmap fst ((elements pma) Vector.! ((mid * (segmentCapacity pma)) + ((segmentsCardinalities pma) Vector.! mid) - 1)))
                             then (mid, mid)
                             else (mid + 1, ub)
 
@@ -288,12 +282,12 @@ findSegment pma val = if (isEmpty pma) then 0 else (find pma 0 ((segmentsCnt pma
 -- | finds index where an element should be put
 -- complexity – O (log (n / log n) + log n) = O (2 log (n) - log log n)
 -- replace linear search to binary – get O (log (n / log n) + log log n) = O (log n)
-findPlaceIndex :: Ord a => a -> PMA a -> Int
-findPlaceIndex val pma = start + linSearch (Vector.slice start len (elements pma))
+findPlaceIndex :: Ord k => k -> PMA k a -> Int
+findPlaceIndex val pma = start + linSearch (Vector.slice start len ((fmap fst) <$> elements pma))
   where
     segmentId = findSegment pma val
     start = segmentId * segmentCapacity pma
-    len = segmentsCardinalities pma Vector.! segmentId
+    len = segmentCapacity pma
     
     linSearch slice = fromMaybe
         (length slice - 1)
@@ -301,12 +295,15 @@ findPlaceIndex val pma = start + linSearch (Vector.slice start len (elements pma
 
 -- * Tests
 
-samplePMA_1 :: PMA Int
+pairWithShow :: Show a => a -> (a, String)
+pairWithShow a = (a, show a)
+
+samplePMA_1 :: PMA Int String
 samplePMA_1 = PMA
   { capacity = 8
   , segmentCapacity = 4
   , height = 2
-  , elements = Vector.fromList
+  , elements = (fmap pairWithShow) <$> Vector.fromList
       [ Just 1, Just 2, Just 3, Just 4
       , Nothing, Nothing, Nothing, Nothing
       ]
@@ -315,12 +312,12 @@ samplePMA_1 = PMA
   , segmentsCardinalities = Vector.fromList [4, 0]
   }
 
-samplePMA_2 :: PMA Int
+samplePMA_2 :: PMA Int String
 samplePMA_2 = PMA
   { capacity = 8,
     segmentCapacity = 4,
     height = 2,
-    elements = Vector.fromList
+    elements = (fmap pairWithShow) <$> Vector.fromList
       [ Just 1, Just 2, Nothing, Nothing
       , Just 3, Just 4, Nothing, Nothing
       ]
@@ -329,12 +326,12 @@ samplePMA_2 = PMA
     , segmentsCardinalities = Vector.fromList [2,2]
   }
 
-samplePMA_3 :: PMA Int
+samplePMA_3 :: PMA Int String
 samplePMA_3 = PMA
   { capacity = 8,
     segmentCapacity = 8,
     height = 1,
-    elements = Vector.fromList
+    elements = (fmap pairWithShow) <$> Vector.fromList
       [ Just 1, Just 2, Just 3, Just 4
       , Just 5, Just 6, Just 7, Nothing
       ]
@@ -343,12 +340,12 @@ samplePMA_3 = PMA
     , segmentsCardinalities = Vector.fromList [7]
   }
 
-samplePMA_4 :: PMA Int
+samplePMA_4 :: PMA Int String
 samplePMA_4 = PMA
   { capacity = 16
   , segmentCapacity = 4
   , height = 3
-  , elements = Vector.fromList
+  , elements = (fmap pairWithShow) <$> Vector.fromList
       [ Just 1,Just 2,Nothing,Nothing
       , Just 4,Just 5,Nothing,Nothing
       , Just 6,Just 7,Nothing,Nothing
@@ -358,19 +355,3 @@ samplePMA_4 = PMA
   , segmentsCnt = 4
   , segmentsCardinalities = Vector.fromList [2,2,2,2]
 }
-
-addElement :: Vector String -> IO()
-addElement list = do
-  print list
-  command <- getLine
-  if command == "+" then
-    do
-      el <- getLine
-      addElement (Vector.snoc list el)
-    else
-        undefined
-
-run :: IO ()
-run = do
-  print "Hello, Azat!"
-  -- addElement Vector.empty
