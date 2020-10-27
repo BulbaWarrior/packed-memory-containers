@@ -16,13 +16,13 @@ spec
   = do
     describe "PMA" $ do
       it "is always sorted"
-        $ property $ prop_sorted emptyPMA
+        $ property $ prop_sorted empty
 
       it "'s total cardinality is always equal to its segment cardinalities sum"
-        $ property $ prop_totalSegmentCardinalities emptyPMA
+        $ property $ prop_totalSegmentCardinalities empty
 
       it "'s nonempy slots counts should be equal to its cardinality"
-        $ property $ prop_elementsCount emptyPMA
+        $ property $ prop_elementsCount empty
 
 
 -- | Repsents a possible operations over a PMA
@@ -31,7 +31,7 @@ data Operation k a = Insert k a
 
 -- | Applies given operation to given PMA
 apply :: (Ord k) => Operation k a -> PMA k a -> PMA k a
-apply (Insert k a) pma = insert (k, a) pma
+apply (Insert k a) pma = insert k a pma
 
 -- | Applies all the operations from list to given PMA
 -- from right to left
@@ -55,7 +55,7 @@ prop_sorted initial operations = sort keys == keys
   where
     pma = construct initial operations
     asList = catMaybes (Vector.toList (elements pma))
-    keys = fmap fst asList -- todo get keys
+    keys = fmap fst asList
 
 
 -- | Applies given operations to given PMA

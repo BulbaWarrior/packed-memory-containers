@@ -25,6 +25,20 @@ data PMA k v = PMA
   , segmentsCardinalities :: Vector Int       -- ^ Number of elements contained in each segment.
   } deriving (Show, Eq, Foldable)
 
+
+-- * Combining?
+
+-- * Traversals
+-- * Folds?
+
+-- * filter
+-- * Submap
+-- * Indexed
+-- * Min/Max
+
+
+
+
 -- * Constants
 
 minCapacity :: Int
@@ -42,35 +56,99 @@ p_h = 0.5
 -- p_0 :: Double
 -- p_0 = 0.1
 
+
 -- * Construction
 
 -- init PMA with given capacity
-initPMA :: Int -> PMA k a
-initPMA c = PMA
-  { capacity = hyperceil c
-  , segmentCapacity = hyperceil c
+initialize :: Int -> PMA k a
+initialize c = PMA
+  { capacity = capacity
+  , segmentCapacity = capacity
   , height = 1
-  , elements = Vector.replicate (hyperceil c) Nothing
+  , elements = Vector.replicate (capacity) Nothing
   , cardinality = 0
   , segmentsCnt = 1
   , segmentsCardinalities = Vector.singleton 0
   }
-
+  where
+    capacity = max 8 (hyperceil c)
 
 -- | Empty packed-memory array.
 --
--- prop> capacity emptyPMA == minCapacity
-emptyPMA :: PMA k a
-emptyPMA = initPMA minCapacity
+-- prop> capacity empty == minCapacity
+empty :: PMA k a
+empty = initialize minCapacity
+
+
+singleton :: k -> a -> PMA k a
+singleton k a = PMA
+  { capacity = capacity
+  , segmentCapacity = capacity
+  , height = 1
+  , elements = Vector.singleton (Just (k, a)) <> Vector.replicate (capacity - 1) Nothing
+  , cardinality = 1
+  , segmentsCnt = 1
+  , segmentsCardinalities = Vector.singleton 1
+  }
+  where
+    capacity = hyperceil minCapacity
+
+-- todo
+-- fromSet :: (k -> a) -> Set k -> Map k a
+
+fromList :: Ord k => [(k, a)] -> PMA k a
+fromList pairs = foldr (uncurry insert) (initialize (length pairs)) pairs
+
+fromListWith :: Ord k => (a -> a -> a) -> [(k, a)] -> PMA k a
+fromListWith combine pairs = foldr (uncurry (insertWith combine)) (initialize (length pairs)) pairs
+
+fromListWithKey :: Ord k => (k -> a -> a -> a) -> [(k, a)] -> PMA k a
+fromListWithKey combine pairs = foldr (uncurry (insertWithKey combine)) (initialize (length pairs)) pairs
+
+-- todo
+-- fromAscList :: Eq k => [(k, a)] -> Map k a
+-- fromAscListWith :: Eq k => (a -> a -> a) -> [(k, a)] -> Map k a
+-- fromAscListWithKey :: Eq k => (k -> a -> a -> a) -> [(k, a)] -> Map k a
+-- fromDistinctAscList :: [(k, a)] -> Map k a
+
+
 
 -- * Insertion
 
--- | Worst case: \(O(n)\).
---
--- Insert an element into a packed-memory array.
-insert :: forall k a. (Ord k) => (k, a) -> PMA k a -> PMA k a
-insert (key, val) pma = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance newPMA segmentId) else newPMA
+insert :: Ord k => k -> a -> PMA k a -> PMA k a
+insert key val pma = snd (insertLookupWithKey override key val pma)
   where
+    override _key newVal _oldVal = newVal
+
+insertWith :: Ord k => (a -> a -> a) -> k -> a -> PMA k a -> PMA k a
+insertWith combine key val = insertWithKey droppingKey key val
+  where
+    droppingKey = const combine
+
+insertWithKey :: Ord k => (k -> a -> a -> a) -> k -> a -> PMA k a -> PMA k a
+insertWithKey combine key val pma = snd (insertLookupWithKey combine key val pma)
+
+insertLookupWithKey :: forall k a. (Ord k) 
+                    => (k -> a -> a -> a) 
+                    -> k 
+                    -> a 
+                    -> PMA k a 
+                    -> (Maybe a, PMA k a)
+insertLookupWithKey combine key val pma =
+    case lookupInsert of Nothing            -> (Nothing, updatedPMA)
+                         Just (pma, oldVal) -> (Just oldVal, pma)
+  where
+    lookupInsert = do
+      oldVal <- pma !? key
+      let combined = combine key val oldVal 
+      let insertIndex = (findPlaceIndex key pma)
+      let toInsert = Just (key, combined)
+      return (pma { 
+        elements = Vector.update (elements pma) (Vector.singleton (insertIndex, toInsert)) 
+        }, oldVal)
+
+    updatedPMA = if (((segmentsCardinalities newPMA) Vector.! segmentId) == (segmentCapacity pma)) then (rebalance newPMA segmentId) else newPMA
+
     segmentId = findSegment pma key
 
     (elements', posToInsert) = findPos (elements pma) ((segmentCapacity pma)*(segmentId) + ((segmentsCardinalities pma) Vector.! segmentId))
@@ -93,14 +171,23 @@ insert (key, val) pma = if (((segmentsCardinalities newPMA) Vector.! segmentId) 
             }
 
 
+-- * Delition / Update todo
+
+-- delete :: Ord k => k -> Map k a -> Map k a
+-- adjust :: Ord k => (a -> a) -> k -> PMA k a -> PMA k a
+-- adjustWithKey :: Ord k => (k -> a -> a) -> k -> Map k a -> Map k a
+-- update :: Ord k => (a -> Maybe a) -> k -> Map k a -> Map k a
+-- updateWithKey :: Ord k => (k -> a -> Maybe a) -> k -> Map k a -> Map k a
+-- updateLookupWithKey :: Ord k => (k -> a -> Maybe a) -> k -> Map k a -> (Maybe a, Map k a)
+-- alter :: Ord k => (Maybe a -> Maybe a) -> k -> Map k a -> Map k a
+
+
+
 -- * Query
 
-isEmpty :: PMA k a -> Bool
-isEmpty pma = (cardinality pma) == 0
 
-
-find :: Ord k => k -> PMA k a -> Maybe a
-find key pma = do
+lookup :: Ord k => k -> PMA k a -> Maybe a
+lookup key pma = do
       Just (k, v) <- elementsVector Vector.!? index
       if k == key
         then Just v
@@ -110,13 +197,63 @@ find key pma = do
     index = findPlaceIndex key pma
 
 
+(!?) :: Ord k => PMA k a -> k -> Maybe a
+(!?) = flip Data.PackedMemoryArray.lookup
+
+-- todo
+-- (!) :: Ord k => Map k a -> k -> a
+
+findWithDefault :: Ord k => a -> k -> PMA k a -> a
+findWithDefault def key pma = case (pma !? key) of Just val -> val
+                                                   Nothing  -> def
+
+member :: Ord k => k -> PMA k a -> Bool
+member key pma = isJust (pma !? key)
+
+notMember :: Ord k => k -> PMA k a -> Bool
+notMember key pma = not (member key pma)
+
+-- todo and others
+-- lookupGE :: Ord k => k -> PMA k v -> Maybe (k, v)
+
+
 -- | Return all elements in range [start, end)
-findInRange :: Ord k => (k, k) -> PMA k a -> [(k, a)]
-findInRange (start, end) pma = catMaybes (Vector.toList slice)
+lookupInRange :: Ord k => (k, k) -> PMA k a -> [(k, a)]
+lookupInRange (start, end) pma = catMaybes (Vector.toList slice)
   where
     startInd = findPlaceIndex start pma
     endInd   = findPlaceIndex end pma
     slice = Vector.slice startInd (endInd - startInd) (elements pma)
+
+
+null :: PMA k a -> Bool
+null pma = (cardinality pma) == 0
+
+size :: PMA k a -> Int
+size pma = cardinality pma
+
+
+-- * Convesrion
+
+elems :: PMA k a -> [a]
+elems = map snd . assocs
+
+keys :: PMA k a -> [k]
+keys = map fst . assocs 
+
+assocs :: PMA k a -> [(k, a)]
+assocs pma = catMaybes (Vector.toList (elements pma))
+
+-- todo
+-- keysSet :: Map k a -> Set k
+
+
+-- * Lists
+
+toList :: PMA k a -> [(k, a)]
+toList = assocs
+
+
 
 
 -- * Helpers
@@ -177,7 +314,7 @@ resize pma = PMA
         where
           getElements :: Vector (Maybe a) -> Vector Int -> Vector (Maybe a)
           getElements elems sizes
-            | null sizes  = Vector.empty
+            | Prelude.null sizes  = Vector.empty
             | otherwise   = curSegment <> (getElements (Vector.drop curSize elems) sizesTail)
             where
               curSize = sizes Vector.! 0
@@ -220,7 +357,7 @@ spread pma elementsNum windowStart windowLength = pma
       where
         getElements :: Vector (Maybe a) -> Vector Int -> Vector (Maybe a)
         getElements elems sizes
-          | null sizes  = Vector.empty
+          | Prelude.null sizes  = Vector.empty
           | otherwise   = curSegment <> (getElements (Vector.drop curSize elems) sizesTail)
           where
             curSize = sizes Vector.! 0
@@ -266,7 +403,7 @@ rebalance pma segmentId = rebalancedPMA
 
 
 findSegment :: forall k v. Ord k => PMA k v -> k -> Int
-findSegment pma val = if (isEmpty pma) then 0 else (find pma 0 ((segmentsCnt pma) - 1))
+findSegment pma val = if (Data.PackedMemoryArray.null pma) then 0 else (find pma 0 ((segmentsCnt pma) - 1))
   where
     find :: PMA k v -> Int -> Int -> Int
     find pma lb ub = if (lb < ub) then (find pma newLB newUB) else lb
