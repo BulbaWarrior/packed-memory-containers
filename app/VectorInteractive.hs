@@ -5,18 +5,22 @@ import System.IO
 
 main :: IO ()
 main = do
-  commands <- map read . lines <$> getContents
+  contents <- getContents
+  let commands = V.fromList $ map read . lines $ contents
   runCommands commands (V.replicate 100 0)
 
-runCommands :: [Command] -> V.Vector Amount -> IO ()
+runCommands :: V.Vector Command -> V.Vector Amount -> IO ()
 runCommands commands vec = do
-  mapM_ print responses
+  mapM_ print $ V.fromList responses
   where
     responses = go commands vec
-    go [] _vec = []
-    go (command:moreCommands) vec = response : go moreCommands vec'
-      where
-        (vec', response) = runCommand command vec
+    go cmds _vec
+      | V.null cmds = []
+      | otherwise =
+        let command = V.head cmds
+            moreCommands = V.tail cmds
+            (vec', response) = runCommand command vec
+        in response : go moreCommands vec'
 
 runCommand :: Command -> V.Vector Amount -> (V.Vector Amount, String)
 runCommand (Update i amount) vec = (V.update vec (V.fromList [(i, amount)]), "Ok.")
