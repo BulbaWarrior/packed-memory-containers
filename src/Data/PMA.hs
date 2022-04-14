@@ -147,8 +147,18 @@ lookup k pma
 getCell :: Int -> PMA k a -> Maybe (k, a)
 getCell pos pma = (cells pma) Vector.! pos
 
+-- | convert a sorted vector into pma
+fromVector :: (Ord k) => Vector (k, a) -> PMA k a
+fromVector vec = runST $ do
+  let metaData = PMA { cardinality = Vector.length vec }
+  cells <- Vector.thaw . Vector.map Just $ vec
+  resize metaData cells
 
-insert :: (Ord k, Show k, Show a) => k -> a -> PMA k a -> PMA k a
+fromList :: (Ord k) => [(k, a)] -> PMA k a
+fromList = fromVector . Vector.fromList
+
+
+insert :: (Ord k) => k -> a -> PMA k a -> PMA k a
 insert k v pma
   | pos < 0 = updatedPma
   | fmap fst (cells (pma) Vector.! pos) == Just k = updatedInPlace
@@ -192,14 +202,14 @@ shiftElems pos vec
             then shiftRight pos emptyPos
             else shiftLeft pos emptyPos
   where
-    shiftRight pos emptyPos = trace "shiftRight" $ do
+    shiftRight pos emptyPos = do
       let sliceLen = emptyPos - pos
           fromSlice = MVector.slice pos sliceLen vec
           toSlice = MVector.slice (pos+1) sliceLen vec
       move toSlice fromSlice
       return pos
 
-    shiftLeft pos emptyPos = trace "shiftLeft" $ do
+    shiftLeft pos emptyPos = do
       let sliceLen = pos - emptyPos
           fromSlice = MVector.slice (emptyPos+1) sliceLen vec
           toSlice = MVector.slice emptyPos sliceLen vec
@@ -286,7 +296,7 @@ window'
   -> MVector s (Maybe (k,a)) -- ^ new cells vector of the pma
   -> ST s (Maybe (MVector s (Maybe (k,a))))
 window' pma pos h cells
-  | h < height pma = trace (mconcat ["trying window ", show windowStart, " ", show windowSize]) $ do
+  | h < height pma = do
       fcandidate <- Vector.freeze candidate
       let density = (fromIntegral . occupancy) fcandidate / fromIntegral windowSize
       if validWindow density
@@ -307,7 +317,7 @@ occupancy :: Vector (Maybe a) -> Int
 occupancy = Vector.length . Vector.filter isJust
 
 rebalance :: PMA k a -> Int -> MVector s (Maybe (k,a)) -> ST s (PMA k a)
-rebalance pma pos vec = trace "rebalance" $ do
+rebalance pma pos vec = do
   maybeWindow <- findWindow pma pos vec
   case maybeWindow of
     Just window -> do
@@ -319,7 +329,7 @@ rebalance pma pos vec = trace "rebalance" $ do
       return newPma
 
 resize :: PMA k a -> MVector s (Maybe (k, a)) -> ST s (PMA k a)
-resize pma cells = trace "resize" $ do
+resize pma cells = do
   let idealSegSize = ceiling . logBase 2 . fromIntegral $ cardinality pma
       idealNumSegments = cardinality pma `ceil_div` idealSegSize
       newNumSegments = hyperceil idealNumSegments -- has to be power of 2
@@ -363,7 +373,7 @@ spread window = do
       occupancy = Vector.length elems
       capacity = MVector.length window
       frequency = fromIntegral capacity / fromIntegral occupancy
-  trace (mconcat ["spread ", show frequency]) $ spread' elems window frequency 0
+  spread' elems window frequency 0
 
 spread' :: Vector (Maybe a) -> MVector s (Maybe a) -> Double -> Double -> ST s ()
 spread' elems cells frequency totalElems
@@ -374,7 +384,7 @@ spread' elems cells frequency totalElems
             then floor (totalElems + frequency) -- excluded
             else (MVector.length cells)
           insertNum = endIndex - startIndex
-          insertSlice = trace (mconcat ["slice ", show startIndex, " ", show endIndex]) $ MVector.slice startIndex insertNum cells
+          insertSlice = MVector.slice startIndex insertNum cells
       if (Vector.length elems > 0)
         then do
           write insertSlice 0 (Vector.head elems)
