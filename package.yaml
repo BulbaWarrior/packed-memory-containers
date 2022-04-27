@@ -34,6 +34,78 @@ dependencies:
 library:
   source-dirs: src
 
+executables:
+  packed-memory-containers-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    dependencies:
+    - packed-memory-containers
+
+  vector-interactive:
+    main: VectorInteractive.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    - -main-is VectorInteractive
+    dependencies:
+    - packed-memory-containers
+
+  vector-read:
+    main: VectorRead.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    - -main-is VectorRead
+    dependencies:
+    - packed-memory-containers
+
+  vector-update:
+    main: VectorUpdate.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    - -main-is VectorUpdate
+    dependencies:
+    - packed-memory-containers
+
+  vector-grow:
+    main: VectorGrow.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    - -main-is VectorGrow
+    dependencies:
+    - packed-memory-containers
+
+  vector-populate:
+    main: VectorPopulate.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    - -main-is VectorPopulate
+    dependencies:
+    - packed-memory-containers
+
 tests:
   spec:
     main:                Spec.hs

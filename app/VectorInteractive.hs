@@ -6,12 +6,19 @@ import System.IO
 main :: IO ()
 main = do
   contents <- getContents
-  let commands = V.map read . V.fromList . lines $ contents :: V.Vector Command
-      (updates, queries) = V.partition (\cmd -> case cmd of Update _ _ -> True; RangeQuery _ _ -> False) commands
-      res = V.foldl (\vec update -> let (vec', _) = runCommand update vec in vec') (V.replicate 100 0) updates
-      responses = V.map (runQuery res) queries
-  mapM_ print responses
-  where runQuery = flip runCommand
+  let commands = V.fromList . lines $ contents
+      -- (updates, queries) = V.partition (\cmd -> case cmd of Update _ _ -> True; RangeQuery _ _ -> False) commands
+      (res, responses) = V.foldl (\(vec, resps) textCommand ->
+                       let command = read textCommand :: Command
+                           (vec', resp) = runCommand command vec
+                       in
+                         case command of
+                           Update _ _ -> (vec', resps)
+                           RangeQuery _ _ -> (vec', resps <> V.singleton resp))
+                    (V.replicate 100 0, V.empty)
+                    commands
+  print res
+  V.mapM_ print responses
 
 
 

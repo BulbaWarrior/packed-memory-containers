@@ -1,3 +1,7 @@
+{-# LANGUAGE DeriveFunctor             #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE RankNTypes                #-}
+
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wall -fdefer-typed-holes #-}
 module Data.PMAMap where
@@ -16,12 +20,51 @@ import qualified Data.Map as DMap
 _THRESHOLD :: Int
 _THRESHOLD = 10
 
+data Stream a = forall s . Stream (s -> Step a s) s
+
+instance Show a => Show (Stream a)
+  where show s = show . toList_s $ s
+
+data Step a s
+  = Done
+  | Yield a s
+  | Skip s
+  deriving (Show, Functor)
+
+{-# INLINE empty_s #-}
+empty_s :: Stream a
+empty_s = Stream (const Done) ()
+
+{-# INLINE cons_s #-}
+cons_s :: a -> Stream a -> Stream a
+cons_s x (Stream next s) = Stream next' (Left x)
+  where
+    next' (Left y)  = Yield y (Right s)
+    next' (Right s) = Right <$> (next s)
+
+{-# INLINE toList_s #-}
+toList_s :: Stream a -> [a]
+toList_s (Stream next s0) = unfold s0
+  where
+    unfold s = case next s of
+      Done       -> []
+      Skip s'    -> unfold s'
+      Yield x s' -> x:(unfold s') -- TODO maybe change direction?
+
+dumpStream :: (Ord k) => Map k a -> Map k a
+dumpStream m = m { getPMA = insertStream (inputStream m) (getPMA m)
+                 , inputStream = empty_s
+                 }
+
+insertStream :: (Ord k) => Stream (k,a) -> PMA k a -> PMA k a
+insertStream stream pma = PMA.fromList . toList_s $ stream
+
 data Map k a = Map { getNS     :: NS k a
                    , getNsSize :: Int
                    , getPMA    :: PMA k a
                    , getMap    :: DMap.Map k a
-                   }
-  deriving (Show)
+                   , inputStream :: Stream (k,a)
+                   } deriving Show
 
 type Chunk k a = Vector (k, a)
 
@@ -49,6 +92,7 @@ empty = Map { getNS      = M0
             , getNsSize = 0
             , getPMA     = PMA.empty
             , getMap     = DMap.empty
+            , inputStream = empty_s
             }
 
 singleton :: k -> v -> Map k v
@@ -58,6 +102,9 @@ singleton k v = Map { getNS      = M0
                     , getMap     = DMap.singleton k v
                     }
 
+{-# INLINE find #-}
+find :: (Ord k) => k -> Map k v -> Maybe v
+find k m = lookup k . dumpStream . dumpPMA $ m
 
 lookup :: (Ord k) => k -> Map k v -> Maybe v
 lookup !k m = maybe fromNS Just (maybe fromPMA Just fromMap)
@@ -136,6 +183,33 @@ insertE k a m
     order (M3 _ _ _ _ rest) = order rest + 1
     newMap = m { getPMA = PMA.insert k a (getPMA m) }
 
+{-# INLINE insert #-}
+insert :: (Ord k) => k -> a -> Map k a -> Map k a
+insert k a m = m { inputStream = cons_s (k,a) (inputStream m) }
+
+{-# INLINE insert' #-}
+insert' :: (Ord k) => k -> a -> Map k a -> Map k a
+insert' k a m = insertE' k a (dumpPMA m)
+-- insertE' k1 a1 (dumpPma (insertE' k a dumpPma m)) >>> insertE' k1 a1 (insertE' k a (dumpPma m))
+
+
+-- insert' k a m = dumped {getPMA = insert_pma k a (getPMA dumped)}
+--   where
+--     dumped = dumpPMA m
+
+
+{-# INLINE insertE' #-}
+insertE' :: (Ord k) => k -> a -> Map k a -> Map k a
+insertE' k a m = m { getPMA = insert_pma k a (getPMA m)}
+
+{-# INLINE insert_pma #-}
+insert_pma :: (Ord k) => k -> a -> PMA k a -> PMA k a
+insert_pma k a = insertF_s (cons_s (k,a))
+
+{-# INLINE insertF_s #-}
+insertF_s :: (Ord k) => (Stream (k,a) -> Stream (k,a)) -> PMA k a -> PMA k a
+insertF_s f pma = insertStream (f empty_s) pma
+-- insertStream (f empty_s) (insertStream (g empty_s)) >>> insertStream (f . g $ empty_s)
 
 -- todo is it amortized?
 dumpPMA :: (Ord k) => Map k a -> Map k a

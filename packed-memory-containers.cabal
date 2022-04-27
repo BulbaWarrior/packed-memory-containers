@@ -1,10 +1,10 @@
 cabal-version: 1.24
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: df784893d6d32e38a22c5cc1be61d2febd83a1767903290f98fca93644d93c97
+-- hash: 7dddf406d8313fc979644cd0af32779d41b715d0367a9ed7c12fb9dd8ed1cfa7
 
 name:           packed-memory-containers
 version:        0.1.0.0
@@ -39,12 +39,140 @@ library
       Data.PackedMemoryQuadtree
       Data.PMA
       Data.PMA.Mutable
+      Data.PMAMap
   other-modules:
       Paths_packed_memory_containers
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
+    , containers
+    , primitive
+    , vector
+  default-language: Haskell2010
+
+executable packed-memory-containers-exe
+  main-is: Main.hs
+  other-modules:
+      PMCDemo
+      VectorGrow
+      VectorInteractive
+      VectorPopulate
+      VectorRead
+      VectorUpdate
+      Paths_packed_memory_containers
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , packed-memory-containers
+    , primitive
+    , vector
+  default-language: Haskell2010
+
+executable vector-grow
+  main-is: VectorGrow.hs
+  other-modules:
+      Main
+      PMCDemo
+      VectorInteractive
+      VectorPopulate
+      VectorRead
+      VectorUpdate
+      Paths_packed_memory_containers
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -main-is VectorGrow
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , packed-memory-containers
+    , primitive
+    , vector
+  default-language: Haskell2010
+
+executable vector-interactive
+  main-is: VectorInteractive.hs
+  other-modules:
+      Main
+      PMCDemo
+      VectorGrow
+      VectorPopulate
+      VectorRead
+      VectorUpdate
+      Paths_packed_memory_containers
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -main-is VectorInteractive
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , packed-memory-containers
+    , primitive
+    , vector
+  default-language: Haskell2010
+
+executable vector-populate
+  main-is: VectorPopulate.hs
+  other-modules:
+      Main
+      PMCDemo
+      VectorGrow
+      VectorInteractive
+      VectorRead
+      VectorUpdate
+      Paths_packed_memory_containers
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -main-is VectorPopulate
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , packed-memory-containers
+    , primitive
+    , vector
+  default-language: Haskell2010
+
+executable vector-read
+  main-is: VectorRead.hs
+  other-modules:
+      Main
+      PMCDemo
+      VectorGrow
+      VectorInteractive
+      VectorPopulate
+      VectorUpdate
+      Paths_packed_memory_containers
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -main-is VectorRead
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , packed-memory-containers
+    , primitive
+    , vector
+  default-language: Haskell2010
+
+executable vector-update
+  main-is: VectorUpdate.hs
+  other-modules:
+      Main
+      PMCDemo
+      VectorGrow
+      VectorInteractive
+      VectorPopulate
+      VectorRead
+      Paths_packed_memory_containers
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -main-is VectorUpdate
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , packed-memory-containers
     , primitive
     , vector
   default-language: Haskell2010
@@ -58,6 +186,7 @@ test-suite doctests
       Glob
     , QuickCheck
     , base
+    , containers
     , doctest
     , primitive
     , template-haskell
@@ -76,6 +205,7 @@ test-suite spec
   build-depends:
       QuickCheck
     , base >=4.7 && <5
+    , containers
     , hspec
     , packed-memory-containers
     , primitive
