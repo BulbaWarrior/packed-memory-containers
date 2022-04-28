@@ -6,9 +6,20 @@ module VectorUpdate where
 import qualified Data.Vector as V
 
 main :: IO ()
-main = do
-  -- values <- map read . lines <$> getContents
+main = fullFusion
+
+fullFusion = do
+  let v = V.fromList [1..10^5]
+      newV = v V.// [(0, x) | x <- [1..10^5]]
+  print $ newV V.! 9
+
+partialFusion = do
+  values <- map read . lines <$> getContents
+  let v = V.fromList [1..10^5]
+      newV = v V.// [(0, x) | x <- values]
+  print $ newV V.! 9
+
+noFusion = do
   let v = V.fromList [1..10^5]
       newV = V.foldl (\acc x -> V.update acc $ V.singleton (0, x)) v $ V.fromList [1..10^5]
-      -- newV = V.update v (V.map (\x -> (0, x)) (V.fromList values))
   print $ newV V.! 9
