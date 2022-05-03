@@ -4,9 +4,10 @@
 module VectorUpdate where
 
 import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
 
 main :: IO ()
-main = partialFusion
+main = withModify2
 
 fullFusion = do
   let v = V.fromList [1..10^5]
@@ -19,6 +20,23 @@ partialFusion = do
       newV = v V.// [(0, x) | x <- values]
   print $ newV V.! 9
 
+withModify = do
+  values <- map read . lines <$> getContents
+  let v = V.fromList [1..100]
+      newV = V.foldl (\vec x -> updateInPlace x vec) v $ V.fromList values
+  print $ newV V.! 9
+  where
+    updateInPlace x = V.modify $ (\vec-> do
+                                     MV.write vec x x)
+
+withModify2 = do
+  values <- map read . lines <$> getContents
+  let v = V.fromList [1..10^7]
+      newV = updateInPlace v values
+  print $ newV V.! 9
+  where
+    updateInPlace v [] = v
+    updateInPlace v (x:xs) = V.modify (\vec-> do MV.write vec x x) v
 
 badFusion = do
   values <- map read . lines <$> getContents
