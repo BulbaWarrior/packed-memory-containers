@@ -4,7 +4,7 @@ cabal-version: 1.24
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7dddf406d8313fc979644cd0af32779d41b715d0367a9ed7c12fb9dd8ed1cfa7
+-- hash: 5cc8b9ac4f73f44779f86016b8c46ae8101713b858658d8eb8bd8a706f0f08d5
 
 name:           packed-memory-containers
 version:        0.1.0.0
@@ -55,6 +55,7 @@ executable packed-memory-containers-exe
   main-is: Main.hs
   other-modules:
       PMCDemo
+      PMCFusion
       VectorGrow
       VectorInteractive
       VectorPopulate
@@ -72,11 +73,34 @@ executable packed-memory-containers-exe
     , vector
   default-language: Haskell2010
 
+executable pmc-fusion
+  main-is: PMCFusion.hs
+  other-modules:
+      Main
+      PMCDemo
+      VectorGrow
+      VectorInteractive
+      VectorPopulate
+      VectorRead
+      VectorUpdate
+      Paths_packed_memory_containers
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -main-is PMCFusion
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , packed-memory-containers
+    , primitive
+    , vector
+  default-language: Haskell2010
+
 executable vector-grow
   main-is: VectorGrow.hs
   other-modules:
       Main
       PMCDemo
+      PMCFusion
       VectorInteractive
       VectorPopulate
       VectorRead
@@ -98,6 +122,7 @@ executable vector-interactive
   other-modules:
       Main
       PMCDemo
+      PMCFusion
       VectorGrow
       VectorPopulate
       VectorRead
@@ -119,6 +144,7 @@ executable vector-populate
   other-modules:
       Main
       PMCDemo
+      PMCFusion
       VectorGrow
       VectorInteractive
       VectorRead
@@ -140,6 +166,7 @@ executable vector-read
   other-modules:
       Main
       PMCDemo
+      PMCFusion
       VectorGrow
       VectorInteractive
       VectorPopulate
@@ -161,6 +188,7 @@ executable vector-update
   other-modules:
       Main
       PMCDemo
+      PMCFusion
       VectorGrow
       VectorInteractive
       VectorPopulate

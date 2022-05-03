@@ -185,31 +185,46 @@ insertE k a m
 
 {-# INLINE insert #-}
 insert :: (Ord k) => k -> a -> Map k a -> Map k a
-insert k a m = m { inputStream = cons_s (k,a) (inputStream m) }
+insert k a map = new . insertPMA k a . dumpPMA $ map
 
-{-# INLINE insert' #-}
-insert' :: (Ord k) => k -> a -> Map k a -> Map k a
-insert' k a m = insertE' k a (dumpPMA m)
--- insertE' k1 a1 (dumpPma (insertE' k a dumpPma m)) >>> insertE' k1 a1 (insertE' k a (dumpPma m))
+{-# NOINLINE insertPMA #-}
+insertPMA :: (Ord k) => k -> a -> Map k a -> Map k a
+insertPMA k a map = map { getPMA = PMA.insert k a (getPMA map) }
+
+{-# NOINLINE new #-}
+new :: Map k a -> Map k a
+new pma = pma
+{-# RULES
+
+"dumpPMA/new" forall p.
+  dumpPMA (new p) = p #-}
+-- {-# INLINE insert #-}
+-- insert :: (Ord k) => k -> a -> Map k a -> Map k a
+-- insert k a m = m { inputStream = cons_s (k,a) (inputStream m) }
+
+-- {-# INLINE insert' #-}
+-- insert' :: (Ord k) => k -> a -> Map k a -> Map k a
+-- insert' k a m = insertE' k a (dumpPMA m)
+-- -- insertE' k1 a1 (dumpPma (insertE' k a dumpPma m)) >>> insertE' k1 a1 (insertE' k a (dumpPma m))
 
 
--- insert' k a m = dumped {getPMA = insert_pma k a (getPMA dumped)}
---   where
---     dumped = dumpPMA m
+-- -- insert' k a m = dumped {getPMA = insert_pma k a (getPMA dumped)}
+-- --   where
+-- --     dumped = dumpPMA m
 
 
-{-# INLINE insertE' #-}
-insertE' :: (Ord k) => k -> a -> Map k a -> Map k a
-insertE' k a m = m { getPMA = insert_pma k a (getPMA m)}
+-- {-# INLINE insertE' #-}
+-- insertE' :: (Ord k) => k -> a -> Map k a -> Map k a
+-- insertE' k a m = m { getPMA = insert_pma k a (getPMA m)}
 
-{-# INLINE insert_pma #-}
-insert_pma :: (Ord k) => k -> a -> PMA k a -> PMA k a
-insert_pma k a = insertF_s (cons_s (k,a))
+-- {-# INLINE insert_pma #-}
+-- insert_pma :: (Ord k) => k -> a -> PMA k a -> PMA k a
+-- insert_pma k a = insertF_s (cons_s (k,a))
 
-{-# INLINE insertF_s #-}
-insertF_s :: (Ord k) => (Stream (k,a) -> Stream (k,a)) -> PMA k a -> PMA k a
-insertF_s f pma = insertStream (f empty_s) pma
--- insertStream (f empty_s) (insertStream (g empty_s)) >>> insertStream (f . g $ empty_s)
+-- {-# INLINE insertF_s #-}
+-- insertF_s :: (Ord k) => (Stream (k,a) -> Stream (k,a)) -> PMA k a -> PMA k a
+-- insertF_s f pma = insertStream (f empty_s) pma
+-- -- insertStream (f empty_s) (insertStream (g empty_s)) >>> insertStream (f . g $ empty_s)
 
 -- todo is it amortized?
 dumpPMA :: (Ord k) => Map k a -> Map k a
