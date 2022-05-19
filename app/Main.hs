@@ -16,7 +16,8 @@ myPma :: [Int] -> PMA.PMA Int Int
 myPma = Vector.foldl (\pma x -> PMA.insert x x pma) PMA.empty . Vector.fromList
 
 newPma :: [Int] -> NewPMA.PMA Int Int
-newPma = NewPMA.fromList . map (\x -> (x, x))
+newPma = foldl (\pma x -> NewPMA.insert x x pma) NewPMA.empty
+-- newPma = NewPMA.fromList . map (\x -> (x, x))
 
 -- generate :: (Foldable f) => (k -> v) -> f k -> PMC.Map k v
 -- generate f fold = foldr (\k map -> insert k (f k) map) PMC.empty
@@ -65,6 +66,6 @@ vectorDemo = do
   print res
 
 newPmaDemo = do
-  let Just res = NewPMA.lookup 123 $ newPma [1..(10^7)]
+  let Just res = NewPMA.lookup 123 $ newPma [1..(10^5)]
   print res
-main = vectorDemo
+main = newPmaDemo

@@ -175,6 +175,15 @@ insert k v pma
       balancedPma <- rebalance newPma insertPos mcells
       return balancedPma
 
+    -- updatedPma =
+    --   let newPma = pma {cardinality = cardinality pma + 1}
+    --       newCells =
+    --         Vector.modify
+    --           (\mcells -> runST $ do
+    --               insertPos <- insertAfter pos (k,v) mcells
+
+    --           )
+
 
 insertAfter :: Int -> a -> MVector s (Maybe a) -> ST s Int
 insertAfter pos a vec = do
@@ -397,3 +406,20 @@ spread' elems cells frequency totalElems
 
 insertList :: (Ord k, Show k, Show v) => PMA k v -> [(k, v)] -> PMA k v
 insertList = Prelude.foldl (\pma (k, v) -> Data.PMA.insert k v pma)
+
+-- data New k a = New (forall s. ST s (PMA k a))
+
+-- run :: New k v -> ST s (PMA  k a)
+-- {-# INLINE run #-}
+-- run (New p) = p
+
+-- new :: New k a -> PMA k a
+-- {-# INLINE_FUSED new #-}
+-- new m = m `seq` runST (run m)
+
+-- clone :: PMA k a -> New k a
+-- {-# INLINE_FUSED clone #-}
+-- clone pma = pma `seq` New (
+--   do
+--     newCells <- Vector.thaw $ cells pma
+--                           )
