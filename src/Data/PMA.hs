@@ -64,6 +64,10 @@ segmentCount pma = capacity pma `div` segmentSize pma
 getElements :: PMA k v -> Vector (k, v)
 getElements = Vector.map (\(Just x) -> x) . Vector.filter isJust . cells
 
+-- backwards compatibility with PMC
+elements :: PMA k v -> Vector (Maybe (k, v))
+elements = Vector.filter isJust . cells
+
 delta_t :: PMA k v -> Double
 delta_t pma = (t_0 - t_h) / (fromIntegral . height $ pma)
 
@@ -93,6 +97,9 @@ empty = PMA
     segmentSize = 1
     capacity = 2^segmentSize
     segCount = capacity `div` segmentSize
+
+null :: PMA k a -> Bool
+null pma = cardinality pma == 0
 
 findl :: Int -> (a -> Bool) -> Vector a -> Maybe Int
 findl (-1) _ _ = Nothing
@@ -133,9 +140,9 @@ binsearch' k vec from to
       then searchLeft vec (mid-1)
       else searchLeft vec mid
 
-lookup :: (Ord k) => k -> PMA k a -> Maybe (k, a)
+lookup :: (Ord k) => k -> PMA k a -> Maybe a
 lookup k pma
-  | key result == Just k = result
+  | key result == Just k = value result
   | otherwise = Nothing
   where
     pos = binsearch k (cells pma)
@@ -143,6 +150,7 @@ lookup k pma
              then cells pma Vector.! pos
              else Nothing
     key = fmap fst
+    value = fmap snd
 
 getCell :: Int -> PMA k a -> Maybe (k, a)
 getCell pos pma = (cells pma) Vector.! pos

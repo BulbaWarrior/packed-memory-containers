@@ -6,7 +6,7 @@ import qualified Data.Vector.Mutable as MVector
 import Control.Monad.ST
 
 insert :: (Ord k) => k -> a -> PMC.Map k a -> PMC.Map k a
-insert = PMC.insertE
+insert = PMC.insert
 
 myMap :: [Int] -> PMC.Map Int Int
 myMap = foldr (\x map -> insert x x map) PMC.empty
@@ -54,7 +54,7 @@ vectorReplace vec ind val = runST $ do
 
 
 pmcDemo = do
-  let Just res = PMC.lookup 123 $ myMap [1..10^5]
+  let Just res = PMC.lookup 123 $ myMap [1..10^6]
   print res
 
 pmaDemo = do
@@ -68,4 +68,4 @@ vectorDemo = do
 newPmaDemo = do
   let Just res = NewPMA.lookup 123 $ newPma [1..(10^5)]
   print res
-main = newPmaDemo
+main = pmcDemo

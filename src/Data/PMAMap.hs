@@ -8,8 +8,8 @@ module Data.PMAMap where
 
 
 import           Prelude hiding (lookup)
-import qualified Data.PackedMemoryArray as PMA
-import           Data.PackedMemoryArray (PMA)
+import qualified Data.PMA as PMA
+import           Data.PMA (PMA)
 import           Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Mutable as MVector
